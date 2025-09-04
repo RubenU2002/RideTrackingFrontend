@@ -13,8 +13,14 @@ module.exports = defineConfig([
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-unused-vars': 'error',
       'prefer-const': 'error',
-      'eqeqeq': ['error', 'always'],
-      'curly': ['error', 'all'],
+      eqeqeq: ['error', 'always'],
+      curly: ['error', 'all'],
+    },
+  },
+  {
+    files: ['scripts/**/*.*'],
+    rules: {
+      'no-console': 'off',
     },
   },
 ]);
