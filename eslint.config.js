@@ -7,4 +7,14 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
+    rules: {
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+      'no-unused-vars': 'error',
+      'prefer-const': 'error',
+      'eqeqeq': ['error', 'always'],
+      'curly': ['error', 'all'],
+    },
+  },
 ]);
