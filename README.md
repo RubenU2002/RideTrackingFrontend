@@ -1,50 +1,81 @@
-# Welcome to your Expo app 👋
+## RideTrackingFrontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación móvil con Expo Router (React Native) para el proyecto RideTracking.
 
-## Get started
+### Requisitos
 
-1. Install dependencies
+- Node.js 18+ o 20+
+- npm 9+ (o yarn/pnpm si prefieres)
+- Expo CLI (opcional, puedes usar `npx`)
 
-   ```bash
-   npm install
-   ```
+### Instalación
 
-2. Start the app
+```bash
+npm install
+```
 
-   ```bash
-   npx expo start
-   ```
+### Ejecutar en desarrollo
 
-In the output, you'll find options to open the app in a
+Inicia el servidor de Expo y elige el destino (iOS, Android o Web):
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+```bash
+npm start
+```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Atajos útiles una vez abierto Expo:
+- i: iOS Simulator (macOS con Xcode)
+- a: Android emulator (con Android Studio)
+- w: Web
 
-## Get a fresh project
+También puedes usar scripts directos:
 
-When you're ready, run:
+```bash
+npm run ios
+npm run android
+npm run web
+```
+
+### Lint
+
+```bash
+npm run lint
+```
+
+### Estructura
+
+- `app/`: rutas con Expo Router.
+- `components/`, `hooks/`, `constants/`: código compartido.
+- `assets/`: imágenes y fuentes.
+
+### Variables de entorno
+
+Usa archivos `.env` locales (no se suben al repo). Ejemplo: crea `.env.example` si necesitas documentar claves.
+
+### Reset del template (opcional)
 
 ```bash
 npm run reset-project
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Publicar en GitHub
 
-## Learn more
+1. Asegúrate de tener `.gitignore` adecuado (incluido en este repo).
+2. Inicializa git y crea el primer commit:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+git init
+git add .
+git commit -m "chore: inicializa proyecto Expo"
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+3. Crea el repo en GitHub y vincúlalo (reemplaza URL):
 
-## Join the community
+```bash
+git branch -M main
+git remote add origin https://github.com/<tu-usuario>/<tu-repo>.git
+git push -u origin main
+```
 
-Join our community of developers creating universal apps.
+### Licencia
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Privado por defecto. Actualiza si corresponde.
