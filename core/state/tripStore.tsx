@@ -36,10 +36,17 @@ function reducer(state: State, action: Action): State {
         current: { id: action.id, start: action.start, points: [] },
       };
     case 'ADD_POINT':
-      if (!state.current) return state;
-      return { ...state, current: { ...state.current, points: [...state.current.points, action.point] } };
+      if (!state.current) {
+        return state;
+      }
+      return {
+        ...state,
+        current: { ...state.current, points: [...state.current.points, action.point] },
+      };
     case 'END_TRIP':
-      if (!state.current) return state;
+      if (!state.current) {
+        return state;
+      }
       return {
         trips: [
           ...state.trips,
@@ -75,19 +82,29 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const endTrip = useCallback((payload: { amount: number; platform: PlatformName }) => {
-    dispatch({ type: 'END_TRIP', end: Date.now(), amount: payload.amount, platform: payload.platform });
+    dispatch({
+      type: 'END_TRIP',
+      end: Date.now(),
+      amount: payload.amount,
+      platform: payload.platform,
+    });
   }, []);
 
   const clearAll = useCallback(() => dispatch({ type: 'CLEAR_ALL' }), []);
 
-  const value = useMemo<Store>(() => ({ ...state, startTrip, addPoint, endTrip, clearAll }), [state, startTrip, addPoint, endTrip, clearAll]);
+  const value = useMemo<Store>(
+    () => ({ ...state, startTrip, addPoint, endTrip, clearAll }),
+    [state, startTrip, addPoint, endTrip, clearAll],
+  );
 
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>;
 }
 
 export function useTripStore() {
   const ctx = useContext(TripContext);
-  if (!ctx) throw new Error('useTripStore must be used within TripProvider');
+  if (!ctx) {
+    throw new Error('useTripStore must be used within TripProvider');
+  }
   return ctx;
 }
 
@@ -103,7 +120,9 @@ export function startMockTracking(add: (p: TripPoint) => void, base: { lat: numb
 }
 
 export function stopMockTracking() {
-  if (mockInterval) clearInterval(mockInterval);
+  if (mockInterval) {
+    clearInterval(mockInterval);
+  }
   mockInterval = null;
 }
 
@@ -148,7 +167,9 @@ export function computeStats(trips: Trip[]): {
   }
 
   const perHourStarts: Record<string, number> = {};
-  for (let h = 0; h < 24; h++) perHourStarts[String(h)] = 0;
+  for (let h = 0; h < 24; h++) {
+    perHourStarts[String(h)] = 0;
+  }
   trips.forEach((t) => {
     const h = new Date(t.start).getHours();
     perHourStarts[String(h)]++;
@@ -156,7 +177,7 @@ export function computeStats(trips: Trip[]): {
 
   const totalMs = trips.reduce((acc, t) => acc + ms(t), 0);
   const totalE = trips.reduce((acc, t) => acc + (t.amount ?? 0), 0);
-  const earningsPerHour = totalMs > 0 ? (totalE / (totalMs / 3600000)) : 0;
+  const earningsPerHour = totalMs > 0 ? totalE / (totalMs / 3600000) : 0;
 
   return { today, last7, perHourStarts, earningsPerHour };
 }

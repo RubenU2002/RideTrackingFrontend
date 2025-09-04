@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/Button';
 import { useTripStore, startMockTracking, stopMockTracking } from '@/core/state/tripStore';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { FareModal } from '../components/FareModal';
-import { Palette } from '@/constants/Colors';
 import { HeatmapView } from '@/features/heatmap/components/HeatmapView';
-import { getHotspotsForHour, haversineKm, topRecommendations } from '@/features/heatmap/recommendation';
+import {
+  getHotspotsForHour,
+  haversineKm,
+  topRecommendations,
+} from '@/features/heatmap/recommendation';
 import { Chip } from '@/components/ui/Chip';
 
 function formatElapsed(ms: number) {
@@ -40,14 +43,18 @@ export default function TripScreen() {
       stopMockTracking();
     }
     return () => {
-      if (t) clearInterval(t);
+      if (t) {
+        clearInterval(t);
+      }
       stopMockTracking();
     };
   }, [current, addPoint]);
 
   const pointsCount = current?.points.length ?? 0;
   const distanceKm = useMemo(() => {
-    if (!current || current.points.length < 2) return 0;
+    if (!current || current.points.length < 2) {
+      return 0;
+    }
     let d = 0;
     for (let i = 1; i < current.points.length; i++) {
       d += haversineKm(current.points[i - 1], current.points[i]);
@@ -56,20 +63,27 @@ export default function TripScreen() {
   }, [current]);
 
   const avgSpeedKmh = useMemo(() => {
-    if (!current) return 0;
+    if (!current) {
+      return 0;
+    }
     const hours = Math.max(1, elapsed) / 3600000;
     return distanceKm / hours;
   }, [elapsed, current, distanceKm]);
 
-  const headerAccent = useMemo(() => ({
-    backgroundColor: bg,
-  }), [bg]);
+  const headerAccent = useMemo(
+    () => ({
+      backgroundColor: bg,
+    }),
+    [bg],
+  );
 
   return (
     <ThemedView style={styles.container}>
       <View style={[styles.header, headerAccent]}>
         <ThemedText type="title">{isActive ? 'Carrera en progreso' : 'Empezar carrera'}</ThemedText>
-        <ThemedText type="subtitle" style={styles.subtitle}>{isActive ? 'Tracking activo' : 'Listo para iniciar'}</ThemedText>
+        <ThemedText type="subtitle" style={styles.subtitle}>
+          {isActive ? 'Tracking activo' : 'Listo para iniciar'}
+        </ThemedText>
       </View>
       <View style={styles.content}>
         <Card style={styles.card}>
@@ -81,12 +95,23 @@ export default function TripScreen() {
                 <Metric label="Velocidad" value={`${avgSpeedKmh.toFixed(1)} km/h`} />
                 <Metric label="Puntos" value={`${pointsCount}`} />
               </View>
-              <Button title="Terminar" variant="danger" size="lg" onPress={() => setShowModal(true)} style={{ marginTop: 12, alignSelf: 'stretch' }} />
+              <Button
+                title="Terminar"
+                variant="danger"
+                size="lg"
+                onPress={() => setShowModal(true)}
+                style={{ marginTop: 12, alignSelf: 'stretch' }}
+              />
             </>
           ) : (
             <>
               <ThemedText>Presiona para iniciar el seguimiento de tu carrera</ThemedText>
-              <Button title="Empezar carrera" size="lg" onPress={startTrip} style={{ marginTop: 16, alignSelf: 'stretch' }} />
+              <Button
+                title="Empezar carrera"
+                size="lg"
+                onPress={startTrip}
+                style={{ marginTop: 16, alignSelf: 'stretch' }}
+              />
             </>
           )}
         </Card>
@@ -100,7 +125,7 @@ export default function TripScreen() {
             {topRecommendations(
               current?.points[current.points.length - 1] ?? { lat: -33.4489, lng: -70.6693 },
               new Date().getHours(),
-              4
+              4,
             ).map((r) => (
               <Chip
                 key={r.name}
@@ -146,7 +171,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
   },
-  metricsRow: { flexDirection: 'row', gap: 12, alignSelf: 'stretch', justifyContent: 'space-between' },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignSelf: 'stretch',
+    justifyContent: 'space-between',
+  },
   chipsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 8 },
 });
 

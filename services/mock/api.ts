@@ -12,13 +12,12 @@ export type TripPayload = {
 export async function syncTrips(payload: TripPayload[]) {
   // Simulate latency
   await new Promise((r) => setTimeout(r, 400));
-  console.log('[mock] syncTrips', payload.length);
+  console.warn('[mock] syncTrips', payload.length);
   return { ok: true } as const;
 }
 
 export async function createTrip(payload: TripPayload) {
   await new Promise((r) => setTimeout(r, 300));
-  console.log('[mock] createTrip', payload.id);
+  console.warn('[mock] createTrip', payload.id);
   return { id: payload.id } as const;
 }
-

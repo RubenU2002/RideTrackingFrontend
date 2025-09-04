@@ -17,17 +17,16 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const system = Appearance.getColorScheme() ?? 'light';
   const resolved = mode === 'system' ? system : mode;
 
-  const value = useMemo(
-    () => ({ mode, resolved, setMode }),
-    [mode, resolved]
-  );
+  const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useThemeController() {
   const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error('useThemeController must be used within AppThemeProvider');
+  if (!ctx) {
+    throw new Error('useThemeController must be used within AppThemeProvider');
+  }
   return ctx;
 }
 
@@ -38,4 +37,3 @@ export function useResolvedColorScheme(): Exclude<ColorSchemeName, null> {
   }
   return ctx.resolved;
 }
-
