@@ -5,18 +5,39 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "ridetrackingfrontend",
+    "scheme": ["ridetrackingfrontend", "com.anonymous.RideTrackingFrontend"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación durante la carrera para registrar el viaje.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Seguimos registrando tu ubicación en segundo plano mientras la carrera está activa.",
+        "UIBackgroundModes": ["location", "location"]
+      },
+      "bundleIdentifier": "com.anonymous.RideTrackingFrontend"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE"
+      ],
+      "foregroundService": {
+        "type": "location",
+        "exported": false
+      },
+      "package": "com.anonymous.RideTrackingFrontend"
     },
     "web": {
       "bundler": "metro",

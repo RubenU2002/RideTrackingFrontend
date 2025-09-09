@@ -8,12 +8,14 @@ import { useThemeController } from '@/core/theme/ThemeProvider';
 import { useTripStore } from '@/core/state/tripStore';
 import { useAuth } from '@/core/auth/AuthContext';
 import { router } from 'expo-router';
+import { useSync } from '@/core/sync/SyncProvider';
 
 export default function SettingsScreen() {
   const [trackingOnlyDuringTrip, setTrackingOnlyDuringTrip] = useState(true);
   const { mode, setMode } = useThemeController();
   const { clearAll, trips } = useTripStore();
   const { logout, user } = useAuth();
+  const { pending, flush } = useSync();
 
   return (
     <ThemedView style={styles.container}>
@@ -60,6 +62,7 @@ export default function SettingsScreen() {
 
         <Card>
           <ThemedText type="subtitle">Datos</ThemedText>
+          <ThemedText style={{ opacity: 0.7 }}>Pendientes por enviar: {pending}</ThemedText>
           <View style={styles.row}>
             <Button
               title="Exportar CSV"
@@ -70,12 +73,26 @@ export default function SettingsScreen() {
               style={styles.rowBtn}
             />
             <Button
+              title="Reintentar sync"
+              variant="secondary"
+              onPress={flush}
+              style={styles.rowBtn}
+            />
+            <Button
               title="Borrar todo"
               variant="secondary"
               onPress={() =>
                 Alert.alert('Borrar datos', '¿Seguro que quieres borrar todo?', [
                   { text: 'Cancelar', style: 'cancel' },
-                  { text: 'Borrar', style: 'destructive', onPress: clearAll },
+                  {
+                    text: 'Borrar',
+                    style: 'destructive',
+                    onPress: async () => {
+                      const { clearAllLocalData } = await import('@/core/storage/tripRepo');
+                      await clearAllLocalData();
+                      clearAll();
+                    },
+                  },
                 ])
               }
               style={styles.rowBtn}

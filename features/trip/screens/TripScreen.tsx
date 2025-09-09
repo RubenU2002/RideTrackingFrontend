@@ -4,7 +4,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { useTripStore, startMockTracking, stopMockTracking } from '@/core/state/tripStore';
+import { useTripStore } from '@/core/state/tripStore';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { FareModal } from '../components/FareModal';
 import { HeatmapView } from '@/features/heatmap/components/HeatmapView';
@@ -14,6 +14,8 @@ import {
   topRecommendations,
 } from '@/features/heatmap/recommendation';
 import { Chip } from '@/components/ui/Chip';
+import { startTripTracking, stopTripTracking, startUiLocationFeed } from '@/core/location/tracking';
+import { useAuth } from '@/core/auth/AuthContext';
 
 function formatElapsed(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -25,6 +27,7 @@ function formatElapsed(ms: number) {
 
 export default function TripScreen() {
   const { current, startTrip, endTrip, addPoint } = useTripStore();
+  const { user } = useAuth();
   const textColor = useThemeColor({}, 'text');
   const bg = useThemeColor({}, 'background');
   const [elapsed, setElapsed] = useState(0);
@@ -35,18 +38,18 @@ export default function TripScreen() {
 
   useEffect(() => {
     let t: ReturnType<typeof setInterval> | null = null;
+    let stopUi: (() => void) | null = null;
     if (current) {
       t = setInterval(() => setElapsed(Date.now() - current.start), 1000);
-      startMockTracking(addPoint, { lat: -33.4489, lng: -70.6693 });
+      startUiLocationFeed({ onPoint: (p) => addPoint(p) })
+        .then((stop) => (stopUi = stop))
+        .catch(() => {});
     } else {
       setElapsed(0);
-      stopMockTracking();
     }
     return () => {
-      if (t) {
-        clearInterval(t);
-      }
-      stopMockTracking();
+      if (t) {clearInterval(t);}
+      if (stopUi) {stopUi();}
     };
   }, [current, addPoint]);
 
@@ -109,7 +112,16 @@ export default function TripScreen() {
               <Button
                 title="Empezar carrera"
                 size="lg"
-                onPress={startTrip}
+                onPress={async () => {
+                  if (!user) {return;}
+                  try {
+                    await startTripTracking({ userId: user.id });
+                    // Update UI state after starting tracking
+                    startTrip();
+                  } catch (e) {
+                    console.warn('No se pudo iniciar tracking', e);
+                  }
+                }}
                 style={{ marginTop: 16, alignSelf: 'stretch' }}
               />
             </>
@@ -141,8 +153,13 @@ export default function TripScreen() {
       <FareModal
         visible={showModal}
         onCancel={() => setShowModal(false)}
-        onSave={(p) => {
+        onSave={async (p) => {
           endTrip(p);
+          try {
+            await stopTripTracking({ amount: p.amount, platform: p.platform });
+          } catch (e) {
+            console.warn('No se pudo finalizar tracking', e);
+          }
           setShowModal(false);
         }}
       />

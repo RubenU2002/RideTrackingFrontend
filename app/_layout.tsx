@@ -10,6 +10,8 @@ import { AppThemeProvider } from '@/core/theme/ThemeProvider';
 import { TripProvider } from '@/core/state/tripStore';
 import { GSProvider } from '@/core/ui/GluestackProvider';
 import { AuthProvider, useAuth } from '@/core/auth/AuthContext';
+import '@/core/location/tracking';
+import { SyncProvider } from '@/core/sync/SyncProvider';
 
 function RootNavigator() {
   const { loading, isAuthenticated } = useAuth();
@@ -51,7 +53,9 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
               <AuthProvider>
-                <RootNavigator />
+                <SyncProvider>
+                  <RootNavigator />
+                </SyncProvider>
               </AuthProvider>
               <StatusBar style="auto" />
             </ThemeProvider>
