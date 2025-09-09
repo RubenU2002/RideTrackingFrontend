@@ -9,6 +9,29 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { AppThemeProvider } from '@/core/theme/ThemeProvider';
 import { TripProvider } from '@/core/state/tripStore';
 import { GSProvider } from '@/core/ui/GluestackProvider';
+import { AuthProvider, useAuth } from '@/core/auth/AuthContext';
+
+function RootNavigator() {
+  const { loading, isAuthenticated } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  return (
+    <Stack>
+      {isAuthenticated ? (
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      ) : (
+        <>
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="register" options={{ headerShown: false }} />
+        </>
+      )}
+      <Stack.Screen name="+not-found" />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -27,10 +50,9 @@ export default function RootLayout() {
         <TripProvider>
           <SafeAreaProvider>
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
+              <AuthProvider>
+                <RootNavigator />
+              </AuthProvider>
               <StatusBar style="auto" />
             </ThemeProvider>
           </SafeAreaProvider>

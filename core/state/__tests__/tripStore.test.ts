@@ -14,6 +14,15 @@ function trip(startOffsetMin: number, durationMin: number, amount: number): Trip
 }
 
 describe('computeStats', () => {
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2025-09-08T12:00:00.000Z'));
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   it('computes today stats correctly', () => {
     const trips: Trip[] = [trip(60, 30, 5000), trip(120, 20, 3000)];
     const { today, earningsPerHour } = computeStats(trips);

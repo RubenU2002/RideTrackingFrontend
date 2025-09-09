@@ -20,15 +20,15 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
-    "@react-navigation/bottom-tabs": "^7.3.10",
-    "@react-navigation/elements": "^2.3.8",
-    "@react-navigation/native": "^7.1.6",
     "@gluestack-style/react": "^1.0.0",
     "@gluestack-ui/config": "^1.0.0",
     "@gluestack-ui/themed": "^1.0.0",
-    "@react-native-aria/overlays": "^0.3.15",
     "@react-native-aria/focus": "^0.2.9",
     "@react-native-aria/interactions": "^0.2.16",
+    "@react-native-aria/overlays": "^0.3.15",
+    "@react-navigation/bottom-tabs": "^7.3.10",
+    "@react-navigation/elements": "^2.3.8",
+    "@react-navigation/native": "^7.1.6",
     "expo": "~53.0.22",
     "expo-blur": "~14.1.5",
     "expo-constants": "~17.1.7",
@@ -37,6 +37,7 @@
     "expo-image": "~2.4.0",
     "expo-linking": "~7.1.7",
     "expo-router": "~5.1.5",
+    "expo-secure-store": "^14.2.3",
     "expo-splash-screen": "~0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
@@ -54,25 +55,26 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^12.7.1",
+    "@types/jest": "^29.5.12",
     "@types/react": "~19.0.10",
-    "typescript": "~5.8.3",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
-    "@types/jest": "^29.5.12",
+    "husky": "^9.1.6",
     "jest": "^29.7.0",
     "jest-expo": "^53.0.0",
-    "@testing-library/react-native": "^12.7.1",
-    "@testing-library/jest-native": "^5.4.3",
-    "react-test-renderer": "19.0.0",
-    "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
-    "prettier": "^3.3.3"
+    "prettier": "^3.3.3",
+    "react-test-renderer": "19.0.0",
+    "typescript": "~5.8.3"
   },
   "private": true,
   "jest": {
     "preset": "jest-expo/universal",
     "setupFilesAfterEnv": [
-      "@testing-library/jest-native/extend-expect"
+      "@testing-library/jest-native/extend-expect",
+      "<rootDir>/jest.setup.ts"
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
@@ -89,7 +91,7 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --cache --max-warnings=0 --fix"
+      "eslint --max-warnings=0 --fix"
     ],
     "*.{json,md,yml,yaml}": [
       "prettier --write"

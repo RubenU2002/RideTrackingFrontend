@@ -6,11 +6,14 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useThemeController } from '@/core/theme/ThemeProvider';
 import { useTripStore } from '@/core/state/tripStore';
+import { useAuth } from '@/core/auth/AuthContext';
+import { router } from 'expo-router';
 
 export default function SettingsScreen() {
   const [trackingOnlyDuringTrip, setTrackingOnlyDuringTrip] = useState(true);
   const { mode, setMode } = useThemeController();
   const { clearAll, trips } = useTripStore();
+  const { logout, user } = useAuth();
 
   return (
     <ThemedView style={styles.container}>
@@ -23,9 +26,24 @@ export default function SettingsScreen() {
         <Card>
           <ThemedText type="subtitle">Apariencia</ThemedText>
           <View style={styles.row}>
-            <Button title="Sistema" variant={mode === 'system' ? 'primary' : 'secondary'} onPress={() => setMode('system')} style={styles.rowBtn} />
-            <Button title="Claro" variant={mode === 'light' ? 'primary' : 'secondary'} onPress={() => setMode('light')} style={styles.rowBtn} />
-            <Button title="Oscuro" variant={mode === 'dark' ? 'primary' : 'secondary'} onPress={() => setMode('dark')} style={styles.rowBtn} />
+            <Button
+              title="Sistema"
+              variant={mode === 'system' ? 'primary' : 'secondary'}
+              onPress={() => setMode('system')}
+              style={styles.rowBtn}
+            />
+            <Button
+              title="Claro"
+              variant={mode === 'light' ? 'primary' : 'secondary'}
+              onPress={() => setMode('light')}
+              style={styles.rowBtn}
+            />
+            <Button
+              title="Oscuro"
+              variant={mode === 'dark' ? 'primary' : 'secondary'}
+              onPress={() => setMode('dark')}
+              style={styles.rowBtn}
+            />
           </View>
         </Card>
 
@@ -43,7 +61,14 @@ export default function SettingsScreen() {
         <Card>
           <ThemedText type="subtitle">Datos</ThemedText>
           <View style={styles.row}>
-            <Button title="Exportar CSV" variant="secondary" onPress={() => Alert.alert('Exportar', 'Mock: exportar CSV de ' + trips.length + ' viajes')} style={styles.rowBtn} />
+            <Button
+              title="Exportar CSV"
+              variant="secondary"
+              onPress={() =>
+                Alert.alert('Exportar', 'Mock: exportar CSV de ' + trips.length + ' viajes')
+              }
+              style={styles.rowBtn}
+            />
             <Button
               title="Borrar todo"
               variant="secondary"
@@ -53,6 +78,24 @@ export default function SettingsScreen() {
                   { text: 'Borrar', style: 'destructive', onPress: clearAll },
                 ])
               }
+              style={styles.rowBtn}
+            />
+          </View>
+        </Card>
+
+        <Card>
+          <ThemedText type="subtitle">Cuenta</ThemedText>
+          <ThemedText style={{ opacity: 0.7, marginBottom: 8 }}>
+            {user ? `Sesión: ${user.name} (${user.email})` : 'No autenticado'}
+          </ThemedText>
+          <View style={styles.row}>
+            <Button
+              title="Cerrar sesión"
+              variant="secondary"
+              onPress={async () => {
+                await logout();
+                router.replace('/login');
+              }}
               style={styles.rowBtn}
             />
           </View>
@@ -69,4 +112,3 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, marginTop: 8 },
   rowBtn: { flex: 1 },
 });
-
