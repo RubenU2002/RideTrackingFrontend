@@ -23,7 +23,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const body = json as Partial<ApiErrorBody>;
-    const message = (body && (body.message as string)) || `HTTP ${res.status}`;
+    let message = (body && (body.message as string)) || `HTTP ${res.status}`;
+    if (res.status === 500) {
+      message = 'Ha ocurrido un error. Por favor, inténtalo de nuevo más tarde.';
+    }
     throw new ApiError(message, res.status, body as ApiErrorBody);
   }
 
