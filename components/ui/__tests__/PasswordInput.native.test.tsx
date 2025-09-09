@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 
 // Mock gluestack components without referencing out-of-scope vars in the factory
@@ -26,9 +27,9 @@ jest.mock('@gluestack-ui/themed', () => {
   };
 });
 
-const isRN = typeof navigator !== 'undefined' && (navigator as any).product === 'ReactNative';
+const isNative = Platform.OS === 'ios' || Platform.OS === 'android';
 
-(isRN ? describe : describe.skip)('PasswordInput (native)', () => {
+(isNative ? describe : describe.skip)('PasswordInput (native)', () => {
   it('toggles secureTextEntry when pressing the eye icon', () => {
     const onChangeText = jest.fn();
     const { getByTestId } = render(
