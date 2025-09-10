@@ -1,61 +1,94 @@
-import React, { createContext, useCallback, useContext, useMemo, useReducer } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useReducer,
+  useEffect,
+} from 'react';
+import { getActiveTrip } from '@/core/storage/tripRepo';
 
 export type PlatformName = 'Uber' | 'DiDi' | 'inDrive' | 'Taxi';
 
 export type TripPoint = {
   lat: number;
   lng: number;
-  ts: number; // epoch ms
+  ts: number;
 };
 
 export type Trip = {
   id: string;
-  start: number; // epoch ms
+  start: number;
   end?: number;
-  amount?: number; // currency units
+  amount?: number;
   platform?: PlatformName;
   points: TripPoint[];
 };
 
+export type CurrentTripStats = {
+  id: string;
+  startTime: number;
+  pointsCount: number;
+  distanceKm: number;
+  lastPoint?: TripPoint;
+};
+
 type State = {
   trips: Trip[];
-  current?: Trip;
+  currentTripStats?: CurrentTripStats;
+  isActiveTrip: boolean;
 };
 
 type Action =
   | { type: 'START_TRIP'; id: string; start: number }
-  | { type: 'ADD_POINT'; point: TripPoint }
+  | { type: 'UPDATE_STATS'; stats: CurrentTripStats }
   | { type: 'END_TRIP'; end: number; amount: number; platform: PlatformName }
-  | { type: 'CLEAR_ALL' };
+  | { type: 'CLEAR_ALL' }
+  | { type: 'SET_ACTIVE_STATUS'; isActive: boolean };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'START_TRIP':
       return {
         ...state,
-        current: { id: action.id, start: action.start, points: [] },
+        isActiveTrip: true,
+        currentTripStats: {
+          id: action.id,
+          startTime: action.start,
+          pointsCount: 0,
+          distanceKm: 0,
+        },
       };
-    case 'ADD_POINT':
-      if (!state.current) {
-        return state;
-      }
+    case 'UPDATE_STATS':
       return {
         ...state,
-        current: { ...state.current, points: [...state.current.points, action.point] },
+        currentTripStats: action.stats,
       };
     case 'END_TRIP':
-      if (!state.current) {
+      if (!state.currentTripStats) {
         return state;
       }
+      const completedTrip: Trip = {
+        id: state.currentTripStats.id,
+        start: state.currentTripStats.startTime,
+        end: action.end,
+        amount: action.amount,
+        platform: action.platform,
+        points: [],
+      };
       return {
-        trips: [
-          ...state.trips,
-          { ...state.current, end: action.end, amount: action.amount, platform: action.platform },
-        ],
-        current: undefined,
+        trips: [...state.trips, completedTrip],
+        isActiveTrip: false,
+        currentTripStats: undefined,
+      };
+    case 'SET_ACTIVE_STATUS':
+      return {
+        ...state,
+        isActiveTrip: action.isActive,
+        currentTripStats: action.isActive ? state.currentTripStats : undefined,
       };
     case 'CLEAR_ALL':
-      return { trips: [], current: undefined };
+      return { trips: [], isActiveTrip: false, currentTripStats: undefined };
     default:
       return state;
   }
@@ -63,22 +96,27 @@ function reducer(state: State, action: Action): State {
 
 type Store = State & {
   startTrip: () => void;
-  addPoint: (p: TripPoint) => void;
+  updateTripStats: (stats: CurrentTripStats) => void;
   endTrip: (payload: { amount: number; platform: PlatformName }) => void;
   clearAll: () => void;
+  checkActiveTrip: () => Promise<void>;
 };
 
 const TripContext = createContext<Store | undefined>(undefined);
 
 export function TripProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, { trips: [] });
+  const [state, dispatch] = useReducer(reducer, {
+    trips: [],
+    isActiveTrip: false,
+    currentTripStats: undefined,
+  });
 
   const startTrip = useCallback(() => {
     dispatch({ type: 'START_TRIP', id: `trip_${Date.now()}`, start: Date.now() });
   }, []);
 
-  const addPoint = useCallback((p: TripPoint) => {
-    dispatch({ type: 'ADD_POINT', point: p });
+  const updateTripStats = useCallback((stats: CurrentTripStats) => {
+    dispatch({ type: 'UPDATE_STATS', stats });
   }, []);
 
   const endTrip = useCallback((payload: { amount: number; platform: PlatformName }) => {
@@ -92,9 +130,23 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
 
   const clearAll = useCallback(() => dispatch({ type: 'CLEAR_ALL' }), []);
 
+  const checkActiveTrip = useCallback(async () => {
+    try {
+      const activeTrip = await getActiveTrip();
+      dispatch({ type: 'SET_ACTIVE_STATUS', isActive: !!activeTrip });
+    } catch (error) {
+      console.warn('Error checking active trip:', error);
+      dispatch({ type: 'SET_ACTIVE_STATUS', isActive: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    checkActiveTrip();
+  }, [checkActiveTrip]);
+
   const value = useMemo<Store>(
-    () => ({ ...state, startTrip, addPoint, endTrip, clearAll }),
-    [state, startTrip, addPoint, endTrip, clearAll],
+    () => ({ ...state, startTrip, updateTripStats, endTrip, clearAll, checkActiveTrip }),
+    [state, startTrip, updateTripStats, endTrip, clearAll, checkActiveTrip],
   );
 
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>;
@@ -106,24 +158,6 @@ export function useTripStore() {
     throw new Error('useTripStore must be used within TripProvider');
   }
   return ctx;
-}
-
-// Simple mock tracker: generates a point every ~6s around a base coordinate
-let mockInterval: ReturnType<typeof setInterval> | null = null;
-
-export function startMockTracking(add: (p: TripPoint) => void, base: { lat: number; lng: number }) {
-  stopMockTracking();
-  mockInterval = setInterval(() => {
-    const jitter = () => (Math.random() - 0.5) * 0.002; // ~100-200m
-    add({ lat: base.lat + jitter(), lng: base.lng + jitter(), ts: Date.now() });
-  }, 6000);
-}
-
-export function stopMockTracking() {
-  if (mockInterval) {
-    clearInterval(mockInterval);
-  }
-  mockInterval = null;
 }
 
 export type DailyStats = {

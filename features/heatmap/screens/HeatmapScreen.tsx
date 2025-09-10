@@ -7,13 +7,14 @@ import { HeatmapView } from '../components/HeatmapView';
 import { defaultHotspots, mockHotspotsByHour } from '../mock';
 import { Button } from '@/components/ui/Button';
 import { quickRecommendation } from '../recommendation';
-import { useTripStore } from '@/core/state/tripStore';
+import { useTripStats } from '@/core/state/useTripStats';
 
 export default function HeatmapScreen() {
   const hour = new Date().getHours();
   const hotspots = useMemo(() => mockHotspotsByHour[hour] ?? defaultHotspots, [hour]);
-  const { current, trips } = useTripStore();
-  const origin = current?.points[current.points.length - 1] ?? trips[trips.length - 1]?.points?.[0] ?? {
+  const { currentStats } = useTripStats();
+
+  const origin = currentStats?.lastPoint ?? {
     lat: -33.4489,
     lng: -70.6693,
   };
@@ -22,7 +23,7 @@ export default function HeatmapScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}> 
+      <View style={styles.header}>
         <ThemedText type="title">Mapa de calor</ThemedText>
         <ThemedText style={{ opacity: 0.7 }}>Tus zonas calientes</ThemedText>
       </View>
@@ -31,7 +32,9 @@ export default function HeatmapScreen() {
         <HeatmapView hotspots={hotspots} />
         <Card>
           <ThemedText type="subtitle">¿A dónde voy?</ThemedText>
-          <ThemedText style={{ marginBottom: 8 }}>Recomendación rápida según tu histórico y hora actual.</ThemedText>
+          <ThemedText style={{ marginBottom: 8 }}>
+            Recomendación rápida según tu histórico y hora actual.
+          </ThemedText>
           <Button
             title="Obtener recomendación"
             onPress={() => setRec(quickRecommendation(origin, hour))}
@@ -39,7 +42,9 @@ export default function HeatmapScreen() {
           {rec && (
             <View style={{ marginTop: 12 }}>
               <ThemedText type="defaultSemiBold">{rec.name}</ThemedText>
-              <ThemedText>~{rec.etaMin} min · {rec.distKm.toFixed(1)} km</ThemedText>
+              <ThemedText>
+                ~{rec.etaMin} min · {rec.distKm.toFixed(1)} km
+              </ThemedText>
             </View>
           )}
         </Card>
@@ -53,4 +58,3 @@ const styles = StyleSheet.create({
   header: { paddingTop: 24, paddingHorizontal: 20, paddingBottom: 8 },
   content: { padding: 20, gap: 16 },
 });
-

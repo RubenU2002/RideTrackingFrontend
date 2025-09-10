@@ -1,20 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useTripStore } from '@/core/state/tripStore';
+import { useTripStats } from '@/core/state/useTripStats';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { FareModal } from '../components/FareModal';
 import { HeatmapView } from '@/features/heatmap/components/HeatmapView';
-import {
-  getHotspotsForHour,
-  haversineKm,
-  topRecommendations,
-} from '@/features/heatmap/recommendation';
+import { getHotspotsForHour, topRecommendations } from '@/features/heatmap/recommendation';
 import { Chip } from '@/components/ui/Chip';
-import { startTripTracking, stopTripTracking, startUiLocationFeed } from '@/core/location/tracking';
+import { startTripTracking, stopTripTracking } from '@/core/location/tracking';
 import { useAuth } from '@/core/auth/AuthContext';
 
 function formatElapsed(ms: number) {
@@ -26,7 +23,8 @@ function formatElapsed(ms: number) {
 }
 
 export default function TripScreen() {
-  const { current, startTrip, endTrip, addPoint } = useTripStore();
+  const { isActiveTrip, startTrip, endTrip, checkActiveTrip } = useTripStore();
+  const { currentStats, refreshStats } = useTripStats();
   const { user } = useAuth();
   const textColor = useThemeColor({}, 'text');
   const bg = useThemeColor({}, 'background');
@@ -34,48 +32,51 @@ export default function TripScreen() {
   const [showModal, setShowModal] = useState(false);
   const [selectedRec, setSelectedRec] = useState<string | null>(null);
 
-  const isActive = !!current;
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
-    let t: ReturnType<typeof setInterval> | null = null;
-    let stopUi: (() => void) | null = null;
-    if (current) {
-      t = setInterval(() => setElapsed(Date.now() - current.start), 1000);
-      startUiLocationFeed({ onPoint: (p) => addPoint(p) })
-        .then((stop) => (stopUi = stop))
-        .catch(() => {});
+    if (isActiveTrip && currentStats?.startTime) {
+      startTimeRef.current = currentStats.startTime;
+
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+
+      const updateElapsed = () => {
+        if (startTimeRef.current) {
+          setElapsed(Date.now() - startTimeRef.current);
+        }
+      };
+
+      updateElapsed();
+      timerIntervalRef.current = setInterval(updateElapsed, 1000);
     } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      startTimeRef.current = null;
       setElapsed(0);
     }
+
     return () => {
-      if (t) {
-        clearInterval(t);
-      }
-      if (stopUi) {
-        stopUi();
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
       }
     };
-  }, [current, addPoint]);
+  }, [isActiveTrip, currentStats?.startTime]);
 
-  const pointsCount = current?.points.length ?? 0;
-  const distanceKm = useMemo(() => {
-    if (!current || current.points.length < 2) {
-      return 0;
-    }
-    let d = 0;
-    for (let i = 1; i < current.points.length; i++) {
-      d += haversineKm(current.points[i - 1], current.points[i]);
-    }
-    return d;
-  }, [current]);
+  const pointsCount = currentStats?.pointsCount ?? 0;
+  const distanceKm = currentStats?.distanceKm ?? 0;
 
   const avgSpeedKmh = useMemo(() => {
-    if (!current) {
+    if (!isActiveTrip || !currentStats || elapsed === 0) {
       return 0;
     }
-    const hours = Math.max(1, elapsed) / 3600000;
+    const hours = elapsed / 3600000;
     return distanceKm / hours;
-  }, [elapsed, current, distanceKm]);
+  }, [elapsed, isActiveTrip, currentStats, distanceKm]);
 
   const headerAccent = useMemo(
     () => ({
@@ -87,14 +88,16 @@ export default function TripScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={[styles.header, headerAccent]}>
-        <ThemedText type="title">{isActive ? 'Carrera en progreso' : 'Empezar carrera'}</ThemedText>
+        <ThemedText type="title">
+          {isActiveTrip ? 'Carrera en progreso' : 'Empezar carrera'}
+        </ThemedText>
         <ThemedText type="subtitle" style={styles.subtitle}>
-          {isActive ? 'Tracking activo' : 'Listo para iniciar'}
+          {isActiveTrip ? 'Tracking activo' : 'Listo para iniciar'}
         </ThemedText>
       </View>
       <View style={styles.content}>
         <Card style={styles.card}>
-          {isActive ? (
+          {isActiveTrip ? (
             <>
               <Text style={[styles.timer, { color: textColor }]}>{formatElapsed(elapsed)}</Text>
               <View style={styles.metricsRow}>
@@ -123,6 +126,8 @@ export default function TripScreen() {
                   try {
                     await startTripTracking({ userId: user.id });
                     startTrip();
+                    await checkActiveTrip();
+                    await refreshStats();
                   } catch (e) {
                     console.warn('No se pudo iniciar tracking', e);
                   }
@@ -140,7 +145,7 @@ export default function TripScreen() {
           <ThemedText type="subtitle">Recomendaciones</ThemedText>
           <View style={styles.chipsRow}>
             {topRecommendations(
-              current?.points[current.points.length - 1] ?? { lat: -33.4489, lng: -70.6693 },
+              currentStats?.lastPoint ?? { lat: -33.4489, lng: -70.6693 },
               new Date().getHours(),
               4,
             ).map((r) => (
@@ -163,6 +168,8 @@ export default function TripScreen() {
           setShowModal(false);
           try {
             await stopTripTracking({ amount: p.amount, platform: p.platform });
+            await checkActiveTrip();
+            await refreshStats();
           } catch (e) {
             console.warn('No se pudo finalizar tracking', e);
           }

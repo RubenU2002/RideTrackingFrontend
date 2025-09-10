@@ -17,11 +17,24 @@ import { createLogger, fmtCoord } from '@/core/utils/logger';
 export const TASK_NAME = 'TRIP_TRACKING';
 const log = createLogger('Tracking');
 
-// Optional foreground listener for screen UI
-let fgSub: Location.LocationSubscription | null = null;
-
-// In-memory dedupe cache: last saved point per trip
 const lastPointByTrip = new Map<string, { lat: number; lng: number; ts: number }>();
+
+type TripStatsUpdateCallback = () => void;
+let statsUpdateCallback: TripStatsUpdateCallback | null = null;
+let lastNotificationTime = 0;
+const NOTIFICATION_THROTTLE_MS = 2000;
+
+export function setStatsUpdateCallback(callback: TripStatsUpdateCallback | null) {
+  statsUpdateCallback = callback;
+}
+
+function notifyStatsUpdate() {
+  const now = Date.now();
+  if (statsUpdateCallback && now - lastNotificationTime > NOTIFICATION_THROTTLE_MS) {
+    lastNotificationTime = now;
+    statsUpdateCallback();
+  }
+}
 
 // Define background task to persist points
 TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
@@ -72,6 +85,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
     log.debug('Adding trippoint', tripPoint);
     await addTripPoint(tripPoint);
     lastPointByTrip.set(active.id, { lat: coords.latitude, lng: coords.longitude, ts });
+    notifyStatsUpdate();
     log.debug(
       'BG saved point',
       `lat=${fmtCoord(coords.latitude)}`,
@@ -148,11 +162,6 @@ export async function stopTripTracking(params: {
   platform: string;
   notes?: string;
 }): Promise<{ queued: boolean; body?: CreateTripDto }> {
-  try {
-    fgSub?.remove();
-  } catch {}
-  fgSub = null;
-
   const end = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
   const active = await getActiveTrip();
   if (!active) {
@@ -232,63 +241,4 @@ export async function stopTripTracking(params: {
     log.warn('Immediate flush failed; will retry later for trip', active.id);
     return { queued: true, body };
   }
-}
-
-export async function startUiLocationFeed(options?: {
-  timeIntervalMs?: number;
-  distanceIntervalM?: number;
-  onPoint?: (p: { lat: number; lng: number; ts: number }) => void;
-}): Promise<() => void> {
-  log.info('Starting UI location feed');
-  const sub = await Location.watchPositionAsync(
-    {
-      accuracy: Location.Accuracy.Balanced,
-      timeInterval: options?.timeIntervalMs ?? DEFAULT_TIME_INTERVAL_MS,
-      distanceInterval: options?.distanceIntervalM ?? DEFAULT_DISTANCE_INTERVAL_M,
-    },
-    async (loc) => {
-      const { coords, timestamp } = loc;
-      const tsRaw = typeof timestamp === 'number' ? timestamp : new Date(timestamp).getTime();
-      const ts = Number.isFinite(tsRaw) ? tsRaw : Date.now();
-      if (coords.accuracy !== null && coords.accuracy !== undefined && coords.accuracy > 80) {
-        return;
-      }
-      const norm = (v: number | null | undefined) =>
-        v === null || v === undefined || !Number.isFinite(v) || v < 0 ? null : v;
-      // write to DB for active trip as well
-      const active = await getActiveTrip();
-      if (active) {
-        const prev = lastPointByTrip.get(active.id);
-        const sameCoords =
-          prev &&
-          Math.abs(prev.lat - coords.latitude) < 1e-6 &&
-          Math.abs(prev.lng - coords.longitude) < 1e-6;
-        if (!sameCoords) {
-          await addTripPoint({
-            tripId: active.id,
-            lat: coords.latitude,
-            lng: coords.longitude,
-            ts,
-            speed: norm(coords.speed),
-            heading: norm(coords.heading),
-            altitude: coords.altitude ?? null,
-            accuracy: coords.accuracy ?? null,
-          });
-          lastPointByTrip.set(active.id, { lat: coords.latitude, lng: coords.longitude, ts });
-          log.debug(
-            'FG saved point',
-            `lat=${fmtCoord(coords.latitude)}`,
-            `lng=${fmtCoord(coords.longitude)}`,
-          );
-        }
-      }
-      options?.onPoint?.({ lat: coords.latitude, lng: coords.longitude, ts });
-    },
-  );
-  return () => {
-    try {
-      sub.remove();
-    } catch {}
-    log.info('Stopped UI location feed');
-  };
 }
