@@ -1,10 +1,13 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
+import cuid from 'cuid';
 import {
   addTripPoint,
   createLocalTrip,
   finalizeLocalTrip,
   getActiveTrip,
+  getTripWithPoints,
+  deleteTripCascade,
 } from '@/core/storage/tripRepo';
 import { DEFAULT_DISTANCE_INTERVAL_M, DEFAULT_TIME_INTERVAL_MS } from '@/core/location/config';
 import { flushOutboxOnce, queueTripToOutbox } from '@/core/sync/outbox';
@@ -17,6 +20,9 @@ const log = createLogger('Tracking');
 // Optional foreground listener for screen UI
 let fgSub: Location.LocationSubscription | null = null;
 
+// In-memory dedupe cache: last saved point per trip
+const lastPointByTrip = new Map<string, { lat: number; lng: number; ts: number }>();
+
 // Define background task to persist points
 TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
   if (error) {
@@ -24,29 +30,48 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
     return;
   }
   const { locations } = data as { locations: Location.LocationObject[] };
-  if (!locations || locations.length === 0) {return;}
+  if (!locations || locations.length === 0) {
+    return;
+  }
   const active = await getActiveTrip();
   if (!active) {
     const started = await Location.hasStartedLocationUpdatesAsync(TASK_NAME);
-    if (started) {await Location.stopLocationUpdatesAsync(TASK_NAME);}
+    if (started) {
+      await Location.stopLocationUpdatesAsync(TASK_NAME);
+    }
     log.info('Locations received with no active trip; stopped updates');
     return;
   }
-  log.debug('BG batch size:', locations.length, 'trip:', active.id);
   for (const loc of locations) {
     const { coords, timestamp } = loc;
-    // Basic filter: ignore very inaccurate points
-    //if (coords.accuracy != null && coords.accuracy > 80) continue;
-    await addTripPoint({
+    if (coords.accuracy !== null && coords.accuracy !== undefined && coords.accuracy > 80) {
+      continue;
+    }
+    const tsRaw = typeof timestamp === 'number' ? timestamp : new Date(timestamp).getTime();
+    const ts = Number.isFinite(tsRaw) ? tsRaw : Date.now();
+    const norm = (v: number | null | undefined) =>
+      v === null || v === undefined || !Number.isFinite(v) || v < 0 ? null : v;
+    const prev = lastPointByTrip.get(active.id);
+    const sameCoords =
+      prev &&
+      Math.abs(prev.lat - coords.latitude) < 1e-6 &&
+      Math.abs(prev.lng - coords.longitude) < 1e-6;
+    if (sameCoords) {
+      continue;
+    }
+    const tripPoint = {
       tripId: active.id,
       lat: coords.latitude,
       lng: coords.longitude,
-      ts: typeof timestamp === 'number' ? timestamp : new Date(timestamp).getTime(),
-      speed: coords.speed ?? null,
-      heading: coords.heading ?? null,
+      ts,
+      speed: norm(coords.speed),
+      heading: norm(coords.heading),
       altitude: coords.altitude ?? null,
       accuracy: coords.accuracy ?? null,
-    });
+    };
+    log.debug('Adding trippoint', tripPoint);
+    await addTripPoint(tripPoint);
+    lastPointByTrip.set(active.id, { lat: coords.latitude, lng: coords.longitude, ts });
     log.debug(
       'BG saved point',
       `lat=${fmtCoord(coords.latitude)}`,
@@ -65,7 +90,9 @@ export type StartTripOptions = {
 
 export async function requestLocationPermissions(): Promise<boolean> {
   const fg = await Location.requestForegroundPermissionsAsync();
-  if (fg.status !== 'granted') {return false;}
+  if (fg.status !== 'granted') {
+    return false;
+  }
   const bg = await Location.requestBackgroundPermissionsAsync();
   return bg.status === 'granted';
 }
@@ -78,7 +105,7 @@ export async function startTripTracking(opts: StartTripOptions): Promise<{ tripI
   }
   log.info('Starting trip tracking for user', opts.userId);
   const start = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-  const tripId = `trip_${Date.now()}`;
+  const tripId = cuid();
   await createLocalTrip({
     id: tripId,
     userId: opts.userId,
@@ -93,7 +120,12 @@ export async function startTripTracking(opts: StartTripOptions): Promise<{ tripI
     `start=${fmtCoord(start.coords.latitude)},${fmtCoord(start.coords.longitude)}`,
     `interval=${opts.timeIntervalMs ?? DEFAULT_TIME_INTERVAL_MS}ms/${opts.distanceIntervalM ?? DEFAULT_DISTANCE_INTERVAL_M}m`,
   );
-
+  log.info(
+    'timeIntervalMs:',
+    opts.timeIntervalMs ?? DEFAULT_TIME_INTERVAL_MS,
+    'distanceIntervalM:',
+    opts.distanceIntervalM ?? DEFAULT_DISTANCE_INTERVAL_M,
+  );
   await Location.startLocationUpdatesAsync(TASK_NAME, {
     accuracy: Location.Accuracy.Balanced,
     timeInterval: opts.timeIntervalMs ?? DEFAULT_TIME_INTERVAL_MS,
@@ -123,7 +155,9 @@ export async function stopTripTracking(params: {
 
   const end = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
   const active = await getActiveTrip();
-  if (!active) {return { queued: false };}
+  if (!active) {
+    return { queued: false };
+  }
 
   await finalizeLocalTrip({
     tripId: active.id,
@@ -144,14 +178,16 @@ export async function stopTripTracking(params: {
 
   // Stop background updates if running
   const started = await Location.hasStartedLocationUpdatesAsync(TASK_NAME);
-  if (started) {await Location.stopLocationUpdatesAsync(TASK_NAME);}
+  if (started) {
+    await Location.stopLocationUpdatesAsync(TASK_NAME);
+  }
   log.info('Background updates stopped for', active.id);
 
   // Try sending or queue
-  // Lazy import to avoid cycle; body creation handled in outbox.flush too.
-  const { getTripWithPoints } = await import('@/core/storage/tripRepo');
   const t = await getTripWithPoints(active.id);
-  if (!t) {return { queued: false };}
+  if (!t) {
+    return { queued: false };
+  }
   log.debug('Preparing payload for trip', active.id, 'points:', t.points.length);
   const body: CreateTripDto = {
     userId: t.trip.userId,
@@ -166,8 +202,17 @@ export async function stopTripTracking(params: {
       latitude: p.lat,
       longitude: p.lng,
       timestamp: new Date(p.ts).toISOString(),
-      speed: p.speed ?? undefined,
-      heading: p.heading ?? undefined,
+      speed:
+        p.speed !== null && p.speed !== undefined && Number.isFinite(p.speed) && p.speed >= 0
+          ? p.speed
+          : undefined,
+      heading:
+        p.heading !== null &&
+        p.heading !== undefined &&
+        Number.isFinite(p.heading) &&
+        p.heading >= 0
+          ? p.heading
+          : undefined,
       altitude: p.altitude ?? undefined,
       accuracy: p.accuracy ?? undefined,
     })),
@@ -175,8 +220,12 @@ export async function stopTripTracking(params: {
 
   // Try flush now; if fails it will be queued after
   try {
-    await queueTripToOutbox(body);
-    log.info('Trip queued to outbox', active.id, 'points:', body.points.length);
+    await queueTripToOutbox(body, active.id);
+    await deleteTripCascade(active.id);
+    try {
+      lastPointByTrip.delete(active.id);
+    } catch {}
+    log.info('Trip queued to outbox and local deleted', active.id, 'points:', body.points.length);
     await flushOutboxOnce();
     return { queued: true, body };
   } catch {
@@ -199,26 +248,39 @@ export async function startUiLocationFeed(options?: {
     },
     async (loc) => {
       const { coords, timestamp } = loc;
-      const ts = typeof timestamp === 'number' ? timestamp : new Date(timestamp).getTime();
-      if (coords.accuracy !== null && coords.accuracy !== undefined && coords.accuracy > 80) {return;}
+      const tsRaw = typeof timestamp === 'number' ? timestamp : new Date(timestamp).getTime();
+      const ts = Number.isFinite(tsRaw) ? tsRaw : Date.now();
+      if (coords.accuracy !== null && coords.accuracy !== undefined && coords.accuracy > 80) {
+        return;
+      }
+      const norm = (v: number | null | undefined) =>
+        v === null || v === undefined || !Number.isFinite(v) || v < 0 ? null : v;
       // write to DB for active trip as well
       const active = await getActiveTrip();
       if (active) {
-        await addTripPoint({
-          tripId: active.id,
-          lat: coords.latitude,
-          lng: coords.longitude,
-          ts,
-          speed: coords.speed ?? null,
-          heading: coords.heading ?? null,
-          altitude: coords.altitude ?? null,
-          accuracy: coords.accuracy ?? null,
-        });
-        log.debug(
-          'FG saved point',
-          `lat=${fmtCoord(coords.latitude)}`,
-          `lng=${fmtCoord(coords.longitude)}`,
-        );
+        const prev = lastPointByTrip.get(active.id);
+        const sameCoords =
+          prev &&
+          Math.abs(prev.lat - coords.latitude) < 1e-6 &&
+          Math.abs(prev.lng - coords.longitude) < 1e-6;
+        if (!sameCoords) {
+          await addTripPoint({
+            tripId: active.id,
+            lat: coords.latitude,
+            lng: coords.longitude,
+            ts,
+            speed: norm(coords.speed),
+            heading: norm(coords.heading),
+            altitude: coords.altitude ?? null,
+            accuracy: coords.accuracy ?? null,
+          });
+          lastPointByTrip.set(active.id, { lat: coords.latitude, lng: coords.longitude, ts });
+          log.debug(
+            'FG saved point',
+            `lat=${fmtCoord(coords.latitude)}`,
+            `lng=${fmtCoord(coords.longitude)}`,
+          );
+        }
       }
       options?.onPoint?.({ lat: coords.latitude, lng: coords.longitude, ts });
     },

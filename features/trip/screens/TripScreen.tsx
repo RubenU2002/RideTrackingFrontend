@@ -48,8 +48,12 @@ export default function TripScreen() {
       setElapsed(0);
     }
     return () => {
-      if (t) {clearInterval(t);}
-      if (stopUi) {stopUi();}
+      if (t) {
+        clearInterval(t);
+      }
+      if (stopUi) {
+        stopUi();
+      }
     };
   }, [current, addPoint]);
 
@@ -113,10 +117,11 @@ export default function TripScreen() {
                 title="Empezar carrera"
                 size="lg"
                 onPress={async () => {
-                  if (!user) {return;}
+                  if (!user) {
+                    return;
+                  }
                   try {
                     await startTripTracking({ userId: user.id });
-                    // Update UI state after starting tracking
                     startTrip();
                   } catch (e) {
                     console.warn('No se pudo iniciar tracking', e);
@@ -155,12 +160,12 @@ export default function TripScreen() {
         onCancel={() => setShowModal(false)}
         onSave={async (p) => {
           endTrip(p);
+          setShowModal(false);
           try {
             await stopTripTracking({ amount: p.amount, platform: p.platform });
           } catch (e) {
             console.warn('No se pudo finalizar tracking', e);
           }
-          setShowModal(false);
         }}
       />
     </ThemedView>

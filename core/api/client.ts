@@ -8,6 +8,9 @@ import type {
   RegisterData,
 } from '@/core/api/types';
 import { ApiError } from '@/core/api/types';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('API');
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getToken();
@@ -25,6 +28,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const body = json as Partial<ApiErrorBody>;
     let message = (body && (body.message as string)) || `HTTP ${res.status}`;
     if (res.status === 500) {
+      log.error('Internal server error', { path, method: options.method, body });
       message = 'Ha ocurrido un error. Por favor, inténtalo de nuevo más tarde.';
     }
     throw new ApiError(message, res.status, body as ApiErrorBody);

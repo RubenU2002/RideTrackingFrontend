@@ -58,6 +58,10 @@ export async function addTripPoint(point: DbPoint): Promise<void> {
     `lat=${fmtCoord(point.lat)}`,
     `lng=${fmtCoord(point.lng)}`,
     `acc=${point.accuracy ?? 'n/a'}m`,
+    `ts=${new Date(point.ts).toISOString()}`,
+    `speed=${point.speed ?? 'n/a'}m/s`,
+    `heading=${point.heading ?? 'n/a'}°`,
+    `altitude=${point.altitude ?? 'n/a'}m`,
   );
 }
 
@@ -98,7 +102,9 @@ export async function getTripWithPoints(
 ): Promise<{ trip: DbTrip; points: DbPoint[] } | null> {
   const db = await getDb();
   const trip = await db.getFirstAsync<DbTrip>('SELECT * FROM trips_local WHERE id=?', tripId);
-  if (!trip) {return null;}
+  if (!trip) {
+    return null;
+  }
   const points = await db.getAllAsync<DbPoint>(
     'SELECT * FROM trip_points WHERE tripId=? ORDER BY ts ASC',
     tripId,
@@ -134,4 +140,11 @@ export async function getPendingCompletedTrips(
 export async function clearAllLocalData(): Promise<void> {
   const db = await getDb();
   await db.execAsync('DELETE FROM trip_points; DELETE FROM trips_local; DELETE FROM outbox;');
+}
+
+export async function deleteTripCascade(tripId: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM trip_points WHERE tripId=?', tripId);
+  await db.runAsync('DELETE FROM trips_local WHERE id=?', tripId);
+  log.info('Deleted local trip and points', tripId);
 }

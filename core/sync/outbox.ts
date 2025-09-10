@@ -1,5 +1,9 @@
 import { getDb } from '@/core/storage/sqlite';
-import { getPendingCompletedTrips, markTripSynced } from '@/core/storage/tripRepo';
+import {
+  getPendingCompletedTrips,
+  markTripSynced,
+  deleteTripCascade,
+} from '@/core/storage/tripRepo';
 import type { DbPoint } from '@/core/storage/sqlite';
 import { tripsApi, type CreateTripDto } from '@/core/api/trips';
 import { API_BASE_URL } from '@/core/config/env';
@@ -15,12 +19,13 @@ export async function pendingOutboxCount(): Promise<number> {
   return row?.c ?? 0;
 }
 
-export async function queueTripToOutbox(tripBody: CreateTripDto): Promise<void> {
+export async function queueTripToOutbox(tripBody: CreateTripDto, tripId?: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `INSERT INTO outbox (endpoint, method, body, attempts, status) VALUES (?, 'POST', ?, 0, 'PENDING')`,
+    `INSERT INTO outbox (endpoint, method, body, attempts, status, tripId) VALUES (?, 'POST', ?, 0, 'PENDING', ?)`,
     '/trips',
     JSON.stringify(tripBody),
+    tripId ?? null,
   );
   log.info('Queued trip body to outbox', 'points:', tripBody.points.length);
 }
@@ -43,8 +48,9 @@ function toCreateTripDto(
     extra.startLat === undefined ||
     extra.startLng === null ||
     extra.startLng === undefined
-  )
-    {return null;}
+  ) {
+    return null;
+  }
   return {
     userId,
     startLatitude: extra.startLat!,
@@ -77,7 +83,9 @@ async function hasGoodInternet(timeoutMs = 4000): Promise<boolean> {
     }).catch(() => null);
     clearTimeout(to);
     const ok = !!res && res.ok;
-    if (!ok) {log.warn('Health check failed');}
+    if (!ok) {
+      log.warn('Health check failed');
+    }
     return ok;
   } catch (_e) {
     log.warn('Error checking internet', _e);
@@ -100,8 +108,9 @@ export async function flushOutboxOnce(): Promise<{ sent: number; failed: number 
     method: string;
     body: string;
     attempts: number;
+    tripId: string | null;
   }>(
-    'SELECT id, endpoint, method, body, attempts FROM outbox WHERE status="PENDING" ORDER BY id ASC LIMIT 10',
+    'SELECT id, endpoint, method, body, attempts, tripId FROM outbox WHERE status="PENDING" ORDER BY id ASC LIMIT 10',
   );
   let sent = 0;
   let failed = 0;
@@ -110,9 +119,19 @@ export async function flushOutboxOnce(): Promise<{ sent: number; failed: number 
     try {
       await tripsApi.createTrip(body);
       sent++;
+      // If this outbox item corresponds to a local trip, mark it as synced
+      if (item.tripId) {
+        try {
+          await markTripSynced(item.tripId);
+        } catch {
+          log.warn('Could not mark trip synced for outbox item', item.tripId);
+        }
+      }
+      log.debug('body:', body);
       await db.runAsync('DELETE FROM outbox WHERE id=?', item.id);
-    } catch {
+    } catch (e) {
       failed++;
+      log.error('Error sending outbox item', item.id, e);
       await db.runAsync(
         'UPDATE outbox SET attempts = attempts + 1, lastAttemptAt=? WHERE id=?',
         Date.now(),
@@ -122,7 +141,16 @@ export async function flushOutboxOnce(): Promise<{ sent: number; failed: number 
   }
 
   // Also try to send any completed trips not yet queued/synced
-  const pendingTrips = await getPendingCompletedTrips(3);
+  // First, build a set of tripIds already pending in outbox to avoid duplicates
+  const queuedTripIdsRows = await db.getAllAsync<{ tripId: string | null }>(
+    'SELECT DISTINCT tripId FROM outbox WHERE status="PENDING" AND tripId IS NOT NULL',
+  );
+  const queuedTripIds = new Set(
+    queuedTripIdsRows.map((r) => r.tripId).filter((v): v is string => !!v),
+  );
+  const pendingTrips = (await getPendingCompletedTrips(3)).filter(
+    (t) => !queuedTripIds.has(t.trip.id),
+  );
   for (const t of pendingTrips) {
     const body = toCreateTripDto(t.trip.userId, t.points, {
       startLat: t.trip.startLat ?? null,
@@ -132,7 +160,9 @@ export async function flushOutboxOnce(): Promise<{ sent: number; failed: number 
       fare: t.trip.amount ?? null,
       notes: t.trip.notes ?? null,
     });
-    if (!body) {continue;}
+    if (!body) {
+      continue;
+    }
     try {
       log.info('Flushing trip', t.trip.id, 'points:', body.points.length);
       await tripsApi.createTrip(body);
@@ -140,7 +170,12 @@ export async function flushOutboxOnce(): Promise<{ sent: number; failed: number 
       sent++;
     } catch (_e) {
       log.warn('Error sending trip', t.trip.id, _e);
-      await queueTripToOutbox(body);
+      await queueTripToOutbox(body, t.trip.id);
+      try {
+        await deleteTripCascade(t.trip.id);
+      } catch (e) {
+        log.warn('Could not delete local trip after queuing to outbox', t.trip.id, e);
+      }
       failed++;
     }
   }

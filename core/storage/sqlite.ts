@@ -45,7 +45,8 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
           body TEXT NOT NULL,
           attempts INTEGER NOT NULL DEFAULT 0,
           lastAttemptAt INTEGER,
-          status TEXT NOT NULL DEFAULT 'PENDING'
+          status TEXT NOT NULL DEFAULT 'PENDING',
+          tripId TEXT
         );
       `);
       return db;
@@ -66,7 +67,7 @@ export type DbTrip = {
   endLng?: number | null;
   amount?: number | null;
   notes?: string | null;
-  status: 'STARTED' | 'COMPLETED';
+  status: 'STARTED' | 'COMPLETED' | 'CANCELLED' | 'PAUSED';
   syncedAt?: number | null;
 };
 
