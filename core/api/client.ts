@@ -1,13 +1,7 @@
-import { API_BASE_URL } from '@/core/config/env';
-import { getToken } from '@/core/auth/tokenStorage';
-import type {
-  ApiErrorBody,
-  ApiSuccess,
-  LoginData,
-  ProfileData,
-  RegisterData,
-} from '@/core/api/types';
+import type { ApiErrorBody, ApiSuccess, LoginData, RegisterData, User } from '@/core/api/types';
 import { ApiError } from '@/core/api/types';
+import { getToken } from '@/core/auth/tokenStorage';
+import { API_BASE_URL } from '@/core/config/env';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('API');
@@ -53,7 +47,7 @@ export const api = {
 export const authApi = {
   login: (email: string, password: string) =>
     api.post<ApiSuccess<LoginData>>('/api/v1/auth/login', { email, password }),
-  profile: () => api.get<ApiSuccess<ProfileData>>('/api/v1/auth/profile'),
+  profile: () => api.get<ApiSuccess<User>>('/api/v1/auth/profile'),
   register: (name: string, email: string, phone: string, password: string) =>
     api.post<ApiSuccess<RegisterData>>('/api/v1/auth/register', { name, email, phone, password }),
 };

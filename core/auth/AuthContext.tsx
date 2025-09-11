@@ -1,8 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getToken } from '@/core/auth/tokenStorage';
-import { authService } from '@/core/auth/authService';
 import type { User } from '@/core/api/types';
-import { authApi } from '@/core/api/client';
+import { authService } from '@/core/auth/authService';
+import { getToken } from '@/core/auth/tokenStorage';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 type AuthState = {
   user: User | null;
@@ -25,8 +24,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = await getToken();
       console.warn('token desde authcontext', token);
       if (token) {
-        const me = await authApi.profile();
-        setUser(me.data.user);
+        const me = await authService.getProfile();
+        setUser(me);
       } else {
         setUser(null);
       }

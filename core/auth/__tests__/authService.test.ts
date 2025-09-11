@@ -1,5 +1,5 @@
-import { authService } from '@/core/auth/authService';
 import { authApi } from '@/core/api/client';
+import { authService } from '@/core/auth/authService';
 import * as token from '@/core/auth/tokenStorage';
 
 jest.mock('@/core/api/client', () => ({
@@ -39,7 +39,7 @@ describe('authService', () => {
   it('getProfile returns user', async () => {
     const user = { id: '1', name: 'B', email: 'b@b.com', phone: '2' };
     (authApi.profile as jest.Mock).mockResolvedValueOnce({
-      data: { user },
+      data: user,
       success: true,
       message: 'ok',
     });

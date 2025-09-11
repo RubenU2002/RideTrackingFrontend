@@ -1,6 +1,6 @@
 import { authApi } from '@/core/api/client';
-import { deleteToken, saveToken, setMemoryToken } from '@/core/auth/tokenStorage';
 import type { User } from '@/core/api/types';
+import { deleteToken, saveToken, setMemoryToken } from '@/core/auth/tokenStorage';
 
 export const authService = {
   async login(email: string, password: string): Promise<User> {
@@ -16,7 +16,7 @@ export const authService = {
 
   async getProfile(): Promise<User> {
     const me = await authApi.profile();
-    return me.data.user;
+    return me.data;
   },
 
   async register(name: string, email: string, phone: string, password: string): Promise<User> {
