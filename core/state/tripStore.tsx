@@ -7,8 +7,9 @@ import React, {
   useEffect,
 } from 'react';
 import { getActiveTrip } from '@/core/storage/tripRepo';
+import { Platform } from '@/core/api/Platform';
 
-export type PlatformName = 'Uber' | 'DiDi' | 'inDrive' | 'Taxi';
+export type PlatformName = Platform;
 
 export type TripPoint = {
   lat: number;

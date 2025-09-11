@@ -1,4 +1,5 @@
 import { getDb, type DbPoint, type DbTrip } from '@/core/storage/sqlite';
+import { Platform } from '@/core/api/Platform';
 import { createLogger, fmtCoord } from '@/core/utils/logger';
 
 const log = createLogger('DB');
@@ -6,7 +7,7 @@ const log = createLogger('DB');
 export async function createLocalTrip(params: {
   id: string;
   userId: string;
-  platform?: string;
+  platform?: Platform;
   startTime: number;
   startLat?: number;
   startLng?: number;
@@ -71,7 +72,7 @@ export async function finalizeLocalTrip(params: {
   endLat?: number;
   endLng?: number;
   amount?: number;
-  platform?: string;
+  platform?: Platform;
   notes?: string;
 }): Promise<void> {
   const db = await getDb();

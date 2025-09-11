@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from '@/core/api/Platform';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -58,7 +59,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
 export type DbTrip = {
   id: string;
   userId: string;
-  platform?: string | null;
+  platform?: Platform | null;
   startTime: number;
   startLat?: number | null;
   startLng?: number | null;

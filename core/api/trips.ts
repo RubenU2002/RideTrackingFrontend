@@ -1,4 +1,5 @@
 import { api } from '@/core/api/client';
+import { Platform } from './Platform';
 
 export type CreateTripPointDto = {
   latitude: number;
@@ -11,19 +12,20 @@ export type CreateTripPointDto = {
 };
 
 export type CreateTripDto = {
-  userId: string;
+  platform: Platform;
+  startTime: string;
+  endTime: string;
   startLatitude: number;
   startLongitude: number;
   endLatitude?: number;
   endLongitude?: number;
-  distance?: number;
   fare?: number;
-  status?: 'STARTED' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+  currency?: string;
   notes?: string;
   points: CreateTripPointDto[];
 };
 
 export const tripsApi = {
   createTrip: (body: CreateTripDto) =>
-    api.post<{ success: boolean; data?: unknown }>(`/trips`, body),
+    api.post<{ success: boolean; data?: unknown }>(`/api/v1/trips`, body),
 };

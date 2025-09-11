@@ -23,10 +23,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers,
   });
+  const bodySent = options.body ? JSON.parse(options.body.toString()) : undefined;
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const body = json as Partial<ApiErrorBody>;
     let message = (body && (body.message as string)) || `HTTP ${res.status}`;
+    log.error('body sent', bodySent);
     if (res.status === 500) {
       log.error('Internal server error', { path, method: options.method, body });
       message = 'Ha ocurrido un error. Por favor, inténtalo de nuevo más tarde.';
@@ -50,8 +52,8 @@ export const api = {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    api.post<ApiSuccess<LoginData>>('/auth/login', { email, password }),
-  profile: () => api.get<ApiSuccess<ProfileData>>('/auth/profile'),
+    api.post<ApiSuccess<LoginData>>('/api/v1/auth/login', { email, password }),
+  profile: () => api.get<ApiSuccess<ProfileData>>('/api/v1/auth/profile'),
   register: (name: string, email: string, phone: string, password: string) =>
-    api.post<ApiSuccess<RegisterData>>('/auth/register', { name, email, phone, password }),
+    api.post<ApiSuccess<RegisterData>>('/api/v1/auth/register', { name, email, phone, password }),
 };

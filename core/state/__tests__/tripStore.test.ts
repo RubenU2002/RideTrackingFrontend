@@ -1,3 +1,4 @@
+import { Platform } from '@/core/api/Platform';
 import { computeStats, Trip } from '@/core/state/tripStore';
 
 // Mock the tripRepo module
@@ -13,7 +14,7 @@ function trip(startOffsetMin: number, durationMin: number, amount: number): Trip
     start,
     end,
     amount,
-    platform: 'Uber',
+    platform: Platform.UBER,
     points: [],
   };
 }

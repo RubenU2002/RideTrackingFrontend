@@ -3,6 +3,7 @@ import { Modal, View, StyleSheet, Text } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { PlatformPicker } from './PlatformPicker';
+import { Platform } from '@/core/api/Platform';
 import type { PlatformName } from '@/core/state/tripStore';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { Input, InputField } from '@gluestack-ui/themed';
@@ -15,7 +16,7 @@ type Props = {
 
 export function FareModal({ visible, onCancel, onSave }: Props) {
   const [amount, setAmount] = useState('');
-  const [platform, setPlatform] = useState<PlatformName>('Uber');
+  const [platform, setPlatform] = useState<PlatformName>(Platform.UBER);
   const textColor = useThemeColor({}, 'text');
 
   return (
@@ -36,7 +37,10 @@ export function FareModal({ visible, onCancel, onSave }: Props) {
           <Text style={[styles.label, { color: textColor }]}>Plataforma</Text>
           <PlatformPicker value={platform} onChange={setPlatform} />
           <View style={{ height: 12 }} />
-          <Button title="Guardar" onPress={() => onSave({ amount: Number(amount) || 0, platform })} />
+          <Button
+            title="Guardar"
+            onPress={() => onSave({ amount: Number(amount) || 0, platform })}
+          />
           <View style={{ height: 8 }} />
           <Button title="Cancelar" variant="secondary" onPress={onCancel} />
         </Card>

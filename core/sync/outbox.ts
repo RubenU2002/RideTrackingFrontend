@@ -4,10 +4,11 @@ import {
   markTripSynced,
   deleteTripCascade,
 } from '@/core/storage/tripRepo';
-import type { DbPoint } from '@/core/storage/sqlite';
+import type { DbPoint, DbTrip } from '@/core/storage/sqlite';
 import { tripsApi, type CreateTripDto } from '@/core/api/trips';
 import { API_BASE_URL } from '@/core/config/env';
 import { createLogger } from '@/core/utils/logger';
+import { isValidPlatform, mapLegacyPlatform } from '../utils/platform';
 
 const log = createLogger('Outbox');
 
@@ -30,36 +31,55 @@ export async function queueTripToOutbox(tripBody: CreateTripDto, tripId?: string
   log.info('Queued trip body to outbox', 'points:', tripBody.points.length);
 }
 
-function toCreateTripDto(
-  userId: string,
-  points: DbPoint[],
-  extra: {
-    startLat?: number | null;
-    startLng?: number | null;
-    endLat?: number | null;
-    endLng?: number | null;
-    fare?: number | null;
-    notes?: string | null;
-  },
-): CreateTripDto | null {
-  if (
-    points.length === 0 ||
-    extra.startLat === null ||
-    extra.startLat === undefined ||
-    extra.startLng === null ||
-    extra.startLng === undefined
-  ) {
+function toCreateTripDto(trip: DbTrip, points: DbPoint[]): CreateTripDto | null {
+  // Validaciones más detalladas
+  if (points.length === 0) {
+    log.warn('Trip has no points, skipping:', trip.id);
     return null;
   }
+
+  if (
+    trip.startLat === null ||
+    trip.startLat === undefined ||
+    trip.startLng === null ||
+    trip.startLng === undefined
+  ) {
+    log.warn('Trip missing start coordinates, skipping:', trip.id);
+    return null;
+  }
+
+  if (!trip.platform) {
+    log.warn('Trip missing platform, skipping:', trip.id);
+    return null;
+  }
+  const platform =
+    typeof trip.platform === 'string'
+      ? isValidPlatform(trip.platform)
+        ? trip.platform
+        : mapLegacyPlatform(trip.platform)
+      : trip.platform;
+
+  if (!trip.startTime) {
+    log.warn('Trip missing startTime, skipping:', trip.id);
+    return null;
+  }
+
+  if (!trip.endTime) {
+    log.warn('Trip missing endTime, skipping:', trip.id);
+    return null;
+  }
+
   return {
-    userId,
-    startLatitude: extra.startLat!,
-    startLongitude: extra.startLng!,
-    endLatitude: extra.endLat ?? undefined,
-    endLongitude: extra.endLng ?? undefined,
-    fare: extra.fare ?? undefined,
-    status: 'COMPLETED',
-    notes: extra.notes ?? undefined,
+    platform: platform,
+    startTime: new Date(trip.startTime).toISOString(),
+    endTime: new Date(trip.endTime).toISOString(),
+    startLatitude: trip.startLat!,
+    startLongitude: trip.startLng!,
+    endLatitude: trip.endLat ?? undefined,
+    endLongitude: trip.endLng ?? undefined,
+    fare: trip.amount ?? undefined,
+    currency: 'COP', // Por defecto COP, se puede hacer configurable después
+    notes: trip.notes ?? undefined,
     points: points.map((p) => ({
       latitude: p.lat,
       longitude: p.lng,
@@ -152,14 +172,7 @@ export async function flushOutboxOnce(): Promise<{ sent: number; failed: number 
     (t) => !queuedTripIds.has(t.trip.id),
   );
   for (const t of pendingTrips) {
-    const body = toCreateTripDto(t.trip.userId, t.points, {
-      startLat: t.trip.startLat ?? null,
-      startLng: t.trip.startLng ?? null,
-      endLat: t.trip.endLat ?? null,
-      endLng: t.trip.endLng ?? null,
-      fare: t.trip.amount ?? null,
-      notes: t.trip.notes ?? null,
-    });
+    const body = toCreateTripDto(t.trip, t.points);
     if (!body) {
       continue;
     }

@@ -12,6 +12,7 @@ import {
 import { DEFAULT_DISTANCE_INTERVAL_M, DEFAULT_TIME_INTERVAL_MS } from '@/core/location/config';
 import { flushOutboxOnce, queueTripToOutbox } from '@/core/sync/outbox';
 import type { CreateTripDto } from '@/core/api/trips';
+import { Platform } from '@/core/api/Platform';
 import { createLogger, fmtCoord } from '@/core/utils/logger';
 
 export const TASK_NAME = 'TRIP_TRACKING';
@@ -97,7 +98,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
 
 export type StartTripOptions = {
   userId: string;
-  platform?: string;
+  platform?: Platform;
   timeIntervalMs?: number;
   distanceIntervalM?: number;
 };
@@ -159,7 +160,7 @@ export async function startTripTracking(opts: StartTripOptions): Promise<{ tripI
 
 export async function stopTripTracking(params: {
   amount: number;
-  platform: string;
+  platform: Platform;
   notes?: string;
 }): Promise<{ queued: boolean; body?: CreateTripDto }> {
   const end = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -198,14 +199,25 @@ export async function stopTripTracking(params: {
     return { queued: false };
   }
   log.debug('Preparing payload for trip', active.id, 'points:', t.points.length);
+  if (!t.trip.platform || !t.trip.startTime || !t.trip.endTime) {
+    log.error('Trip missing required fields', {
+      platform: t.trip.platform,
+      startTime: t.trip.startTime,
+      endTime: t.trip.endTime,
+    });
+    return { queued: false };
+  }
+
   const body: CreateTripDto = {
-    userId: t.trip.userId,
+    platform: t.trip.platform,
+    startTime: new Date(t.trip.startTime).toISOString(),
+    endTime: new Date(t.trip.endTime).toISOString(),
     startLatitude: t.trip.startLat ?? 0,
     startLongitude: t.trip.startLng ?? 0,
     endLatitude: t.trip.endLat ?? undefined,
     endLongitude: t.trip.endLng ?? undefined,
     fare: t.trip.amount ?? undefined,
-    status: 'COMPLETED',
+    currency: 'COP',
     notes: t.trip.notes ?? undefined,
     points: t.points.map((p) => ({
       latitude: p.lat,
