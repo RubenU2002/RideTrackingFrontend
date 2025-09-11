@@ -1,13 +1,13 @@
+import { Platform } from '@/core/api/Platform';
+import { getActiveTrip } from '@/core/storage/tripRepo';
 import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
-  useEffect,
 } from 'react';
-import { getActiveTrip } from '@/core/storage/tripRepo';
-import { Platform } from '@/core/api/Platform';
 
 export type PlatformName = Platform;
 
@@ -161,58 +161,4 @@ export function useTripStore() {
   return ctx;
 }
 
-export type DailyStats = {
-  dateKey: string; // YYYY-MM-DD
-  trips: number;
-  drivingMs: number;
-  earnings: number;
-};
-
-export function computeStats(trips: Trip[]): {
-  today: DailyStats;
-  last7: DailyStats[];
-  perHourStarts: Record<string, number>; // '0'..'23'
-  earningsPerHour: number;
-} {
-  const now = new Date();
-  const dateKey = (d: Date) => d.toISOString().slice(0, 10);
-  const isToday = (t: Trip) => dateKey(new Date(t.start)) === dateKey(now);
-
-  const ms = (t: Trip) => Math.max(0, (t.end ?? Date.now()) - t.start);
-  const todayTrips = trips.filter(isToday);
-  const today: DailyStats = {
-    dateKey: dateKey(now),
-    trips: todayTrips.length,
-    drivingMs: todayTrips.reduce((acc, t) => acc + ms(t), 0),
-    earnings: todayTrips.reduce((acc, t) => acc + (t.amount ?? 0), 0),
-  };
-
-  const last7: DailyStats[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const dk = dateKey(d);
-    const dayTrips = trips.filter((t) => dateKey(new Date(t.start)) === dk);
-    last7.push({
-      dateKey: dk,
-      trips: dayTrips.length,
-      drivingMs: dayTrips.reduce((acc, t) => acc + ms(t), 0),
-      earnings: dayTrips.reduce((acc, t) => acc + (t.amount ?? 0), 0),
-    });
-  }
-
-  const perHourStarts: Record<string, number> = {};
-  for (let h = 0; h < 24; h++) {
-    perHourStarts[String(h)] = 0;
-  }
-  trips.forEach((t) => {
-    const h = new Date(t.start).getHours();
-    perHourStarts[String(h)]++;
-  });
-
-  const totalMs = trips.reduce((acc, t) => acc + ms(t), 0);
-  const totalE = trips.reduce((acc, t) => acc + (t.amount ?? 0), 0);
-  const earningsPerHour = totalMs > 0 ? totalE / (totalMs / 3600000) : 0;
-
-  return { today, last7, perHourStarts, earningsPerHour };
-}
+// Local computeStats removed in favor of backend-powered statistics endpoint.

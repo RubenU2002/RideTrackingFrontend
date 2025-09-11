@@ -6,9 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors, Palette } from '@/constants/Colors';
 import { useAuth } from '@/core/auth/AuthContext';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -21,6 +21,9 @@ export default function TabLayout() {
     return <Redirect href="/login" />;
   }
 
+  const bg = colorScheme === 'dark' ? Palette.dark.surfaceAlt : Palette.light.surfaceAlt;
+  const border = colorScheme === 'dark' ? Palette.dark.border : Palette.light.border;
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
       <Tabs
@@ -32,8 +35,13 @@ export default function TabLayout() {
           tabBarStyle: Platform.select({
             ios: {
               position: 'absolute',
+              backgroundColor: 'transparent', // blur handles appearance
             },
-            default: {},
+            default: {
+              backgroundColor: bg,
+              borderTopColor: border,
+              borderTopWidth: 0.5,
+            },
           }),
         }}
       >

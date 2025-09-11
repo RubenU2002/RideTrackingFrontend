@@ -1,17 +1,24 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Switch, Alert } from 'react-native';
-import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { Card } from '@/components/ui/Card';
+import { ThemedView } from '@/components/ThemedView';
 import { Button } from '@/components/ui/Button';
-import { useThemeController } from '@/core/theme/ThemeProvider';
-import { useTripStore } from '@/core/state/tripStore';
+import { Card } from '@/components/ui/Card';
 import { useAuth } from '@/core/auth/AuthContext';
-import { router } from 'expo-router';
+import { loadSettings, saveSettings } from '@/core/settings/settingsStorage';
+import { useTripStore } from '@/core/state/tripStore';
 import { useSync } from '@/core/sync/SyncProvider';
+import { useThemeController } from '@/core/theme/ThemeProvider';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Alert, StyleSheet, Switch, View } from 'react-native';
 
 export default function SettingsScreen() {
   const [trackingOnlyDuringTrip, setTrackingOnlyDuringTrip] = useState(true);
+  useEffect(() => {
+    (async () => {
+      const s = await loadSettings();
+      setTrackingOnlyDuringTrip(s.trackingOnlyDuringTrip);
+    })();
+  }, []);
   const { mode, setMode } = useThemeController();
   const { clearAll, trips } = useTripStore();
   const { logout, user } = useAuth();
@@ -53,7 +60,13 @@ export default function SettingsScreen() {
           <ThemedText type="subtitle">Privacidad</ThemedText>
           <View style={[styles.row, { alignItems: 'center' }]}>
             <ThemedText style={{ flex: 1 }}>Tracking solo durante la carrera</ThemedText>
-            <Switch value={trackingOnlyDuringTrip} onValueChange={setTrackingOnlyDuringTrip} />
+            <Switch
+              value={trackingOnlyDuringTrip}
+              onValueChange={async (v) => {
+                setTrackingOnlyDuringTrip(v);
+                await saveSettings({ trackingOnlyDuringTrip: v });
+              }}
+            />
           </View>
           <ThemedText style={{ opacity: 0.7 }}>
             Tus datos se guardan localmente. Próximamente podrás sincronizar con la nube.

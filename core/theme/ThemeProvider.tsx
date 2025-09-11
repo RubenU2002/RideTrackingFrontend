@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Appearance, ColorSchemeName } from 'react-native';
+import { loadThemeMode, saveThemeMode } from './themeStorage';
 
 type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -12,13 +13,25 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>('system');
+  const [mode, setModeState] = useState<ThemeMode>('system');
+  useEffect(() => {
+    (async () => {
+      const stored = await loadThemeMode();
+      if (stored) {
+        setModeState(stored);
+      }
+    })();
+  }, []);
+
+  const setMode = useCallback((m: ThemeMode) => {
+    setModeState(m);
+    saveThemeMode(m).catch(() => {});
+  }, []);
 
   const system = Appearance.getColorScheme() ?? 'light';
   const resolved = mode === 'system' ? system : mode;
 
-  const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved]);
-
+  const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved, setMode]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
