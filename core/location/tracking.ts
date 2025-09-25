@@ -255,3 +255,26 @@ export async function stopTripTracking(params: {
     return { queued: true, body };
   }
 }
+
+export async function cancelTripTracking(): Promise<void> {
+  const started = await Location.hasStartedLocationUpdatesAsync(TASK_NAME);
+  if (started) {
+    await Location.stopLocationUpdatesAsync(TASK_NAME);
+  }
+
+  const active = await getActiveTrip();
+  if (!active) {
+    log.info('No active trip to cancel');
+    return;
+  }
+
+  try {
+    await deleteTripCascade(active.id);
+    try {
+      lastPointByTrip.delete(active.id);
+    } catch {}
+    log.info('Cancelled trip and removed local data', active.id);
+  } catch (e) {
+    log.warn('Failed to cancel trip locally', e);
+  }
+}

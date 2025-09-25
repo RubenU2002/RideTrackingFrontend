@@ -47,6 +47,7 @@ type Action =
   | { type: 'START_TRIP'; id: string; start: number }
   | { type: 'UPDATE_STATS'; stats: CurrentTripStats }
   | { type: 'END_TRIP'; end: number; amount: number; platform: PlatformName }
+  | { type: 'CANCEL_TRIP' }
   | { type: 'CLEAR_ALL' }
   | { type: 'SET_ACTIVE_STATUS'; isActive: boolean };
 
@@ -85,6 +86,12 @@ function reducer(state: State, action: Action): State {
         isActiveTrip: false,
         currentTripStats: undefined,
       };
+    case 'CANCEL_TRIP':
+      return {
+        ...state,
+        isActiveTrip: false,
+        currentTripStats: undefined,
+      };
     case 'SET_ACTIVE_STATUS':
       return {
         ...state,
@@ -102,6 +109,7 @@ type Store = State & {
   startTrip: () => void;
   updateTripStats: (stats: CurrentTripStats) => void;
   endTrip: (payload: { amount: number; platform: PlatformName }) => void;
+  cancelTrip: () => void;
   clearAll: () => void;
   checkActiveTrip: () => Promise<void>;
 };
@@ -132,6 +140,10 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const cancelTrip = useCallback(() => {
+    dispatch({ type: 'CANCEL_TRIP' });
+  }, []);
+
   const clearAll = useCallback(() => dispatch({ type: 'CLEAR_ALL' }), []);
 
   const checkActiveTrip = useCallback(async () => {
@@ -149,8 +161,16 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
   }, [checkActiveTrip]);
 
   const value = useMemo<Store>(
-    () => ({ ...state, startTrip, updateTripStats, endTrip, clearAll, checkActiveTrip }),
-    [state, startTrip, updateTripStats, endTrip, clearAll, checkActiveTrip],
+    () => ({
+      ...state,
+      startTrip,
+      updateTripStats,
+      endTrip,
+      cancelTrip,
+      clearAll,
+      checkActiveTrip,
+    }),
+    [state, startTrip, updateTripStats, endTrip, cancelTrip, clearAll, checkActiveTrip],
   );
 
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>;

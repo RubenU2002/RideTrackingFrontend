@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { useAuth } from '@/core/auth/AuthContext';
-import { startTripTracking, stopTripTracking } from '@/core/location/tracking';
+import { startTripTracking, stopTripTracking, cancelTripTracking } from '@/core/location/tracking';
 import { useTripStore } from '@/core/state/tripStore';
 import { useTripStats } from '@/core/state/useTripStats';
 import { getCurrentHourInColombia, nowInColombia } from '@/core/utils/timezone';
@@ -24,7 +24,7 @@ function formatElapsed(ms: number) {
 }
 
 export default function TripScreen() {
-  const { isActiveTrip, startTrip, endTrip, checkActiveTrip } = useTripStore();
+  const { isActiveTrip, startTrip, endTrip, cancelTrip, checkActiveTrip } = useTripStore();
   const { currentStats, refreshStats } = useTripStats();
   const { user } = useAuth();
   const textColor = useThemeColor({}, 'text');
@@ -109,13 +109,31 @@ export default function TripScreen() {
                 />
                 <Metric label="Puntos" value={`${pointsCount}`} />
               </View>
-              <Button
-                title="Terminar"
-                variant="danger"
-                size="lg"
-                onPress={() => setShowModal(true)}
-                style={{ marginTop: 12, alignSelf: 'stretch' }}
-              />
+              <View style={styles.actionsRow}>
+                <Button
+                  title="Terminar"
+                  variant="danger"
+                  size="lg"
+                  onPress={() => setShowModal(true)}
+                  style={{ alignSelf: 'stretch', flex: 1 }}
+                />
+                <Button
+                  title="Cancelar"
+                  variant="secondary"
+                  size="lg"
+                  onPress={async () => {
+                    try {
+                      await cancelTripTracking();
+                      cancelTrip();
+                      await checkActiveTrip();
+                      await refreshStats();
+                    } catch (e) {
+                      console.warn('No se pudo cancelar el viaje', e);
+                    }
+                  }}
+                  style={{ alignSelf: 'stretch', flex: 1 }}
+                />
+              </View>
             </>
           ) : (
             <>
@@ -209,6 +227,12 @@ const styles = StyleSheet.create({
     gap: 12,
     alignSelf: 'stretch',
     justifyContent: 'space-between',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignSelf: 'stretch',
+    marginTop: 12,
   },
   chipsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 8 },
 });
