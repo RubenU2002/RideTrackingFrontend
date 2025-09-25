@@ -55,11 +55,13 @@ type BackendStatsResponse = {
 };
 
 function toPlatformsDistribution(summary: DailySummary): PlatformsDistribution[] {
-  return Object.entries(summary.platforms).map(([platform, value]) => ({
+  const result = Object.entries(summary.platforms).map(([platform, value]) => ({
     platform,
     total: value,
     percentage: Math.round((value / Math.max(1, summary.total)) * 100),
   }));
+
+  return result;
 }
 
 function aggregateBase(dataset: DailySummary[], selected: DailySummary): TripStatistics {

@@ -91,7 +91,7 @@
       "/.expo/"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!(jest-)?react-native|@react-native|@react-native-community|expo(nent)?|expo|@expo(nent)?/.*|expo-.*|@expo/.*|@unimodules/.*|unimodules|@react-navigation/.*|@gluestack-ui/.*|@react-native-aria/.*)"
+      "node_modules/(?!(jest-)?react-native|@react-native|@react-native-community|expo(nent)?|expo|@expo(nent)?/.*|expo-.*|@expo/.*|@unimodules/.*|unimodules|@react-navigation/.*|@gluestack-ui/.*|@gluestack-style/.*|@react-native-aria/.*)"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"

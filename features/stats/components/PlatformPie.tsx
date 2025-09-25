@@ -14,13 +14,17 @@ export function PlatformPie({ data }: { data: PlatformsDistribution[] }) {
 
   const segments = useMemo(() => {
     let current = -Math.PI / 2;
-    return filtered.map((d) => {
+    const result = filtered.map((d, index) => {
       const angle = (d.total / total) * Math.PI * 2;
       const start = current;
-      const end = current + angle;
+      let end = current + angle;
+      if (filtered.length === 1 && Math.abs(angle - Math.PI * 2) < 0.001) {
+        end = start + Math.PI * 2 - 0.001;
+      }
       current = end;
       return { ...d, start, end };
     });
+    return result;
   }, [filtered, total]);
 
   const donut = segments.map((seg) => (

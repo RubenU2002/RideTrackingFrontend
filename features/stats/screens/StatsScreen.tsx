@@ -11,7 +11,14 @@ import { CalendarModal } from '../components/CalendarModal';
 import { DailySummaryCards } from '../components/DailySummaryCards';
 import { DateSelector } from '../components/DateSelector';
 import { EarningsPerTripBars } from '../components/EarningsPerTripBars';
+import { EmptyStatsView } from '../components/EmptyStatsView';
 import { PlatformPie } from '../components/PlatformPie';
+import {
+  ActivityBlocksSkeleton,
+  DailySummaryCardsSkeleton,
+  EarningsPerTripBarsSkeleton,
+  PlatformPieSkeleton,
+} from '../components/StatsSkeleton';
 
 const log = createLogger('StatsScreen');
 
@@ -92,6 +99,13 @@ export default function StatsScreen() {
     const sel = new Date(selectedDate + 'T00:00:00');
     return `${sel.getDate()} ${meses[sel.getMonth()]} ${sel.getFullYear()}`;
   };
+  const hasData =
+    data &&
+    (data.summary.trips > 0 ||
+      data.summary.total > 0 ||
+      data.summary.activityBlocks.some((value) => value > 0));
+
+  const isToday = selectedDate === getTodayInColombia();
 
   return (
     <ThemedView style={styles.container}>
@@ -108,9 +122,27 @@ export default function StatsScreen() {
             onOpenCalendar={() => setCalendarOpen(true)}
             disableNext={selectedDate === getTodayInColombia()}
           />
-          {loading && <ThemedText style={styles.loading}>Cargando…</ThemedText>}
+
+          {/* Estado de carga con skeletons */}
+          {loading && (
+            <>
+              <DailySummaryCardsSkeleton />
+              <EarningsPerTripBarsSkeleton />
+              <PlatformPieSkeleton />
+              <ActivityBlocksSkeleton />
+            </>
+          )}
+
+          {/* Estado de error */}
           {error && !loading && <ThemedText style={styles.error}>{error}</ThemedText>}
-          {!loading && !error && data && (
+
+          {/* Vista vacía cuando no hay datos */}
+          {!loading && !error && data && !hasData && (
+            <EmptyStatsView onRefresh={onRefresh} selectedDate={selectedDate} isToday={isToday} />
+          )}
+
+          {/* Datos reales cuando hay información */}
+          {!loading && !error && data && hasData && (
             <>
               <DailySummaryCards summary={data.summary} prev={data.prevDaySummary} />
               <EarningsPerTripBars values={data.summary.earningsPerTrip} />
@@ -137,6 +169,5 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingBottom: 48 },
   stack: { padding: 16, gap: 18 },
-  loading: { padding: 8, opacity: 0.7 },
   error: { padding: 8, color: '#ef4444' },
 });
