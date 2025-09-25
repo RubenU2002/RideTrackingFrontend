@@ -54,7 +54,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      ["@rnmapbox/maps", {}]
     ],
     "experiments": {
       "typedRoutes": true

@@ -12,6 +12,7 @@ import { SyncProvider } from '@/core/sync/SyncProvider';
 import { AppThemeProvider } from '@/core/theme/ThemeProvider';
 import { GSProvider } from '@/core/ui/GluestackProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import '@/core/mapbox/init';
 
 function RootNavigator() {
   const { loading, isAuthenticated } = useAuth();
