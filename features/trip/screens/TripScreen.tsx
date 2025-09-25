@@ -18,6 +18,14 @@ import { ButtonText, Button as GSButton } from '@gluestack-ui/themed';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { FareModal } from '../components/FareModal';
 
 function formatElapsed(ms: number) {
@@ -42,6 +50,49 @@ export default function TripScreen() {
   const [route, setRoute] = useState<[number, number][]>([]); // [lng, lat]
   const [startCoord, setStartCoord] = useState<[number, number] | null>(null);
   const [currentCoord, setCurrentCoord] = useState<[number, number] | null>(null);
+
+  // Animaciones suaves
+  const mapProg = useSharedValue(0);
+  const detailsProg = useSharedValue(0);
+
+  useEffect(() => {
+    mapProg.value = withTiming(isActiveTrip ? 1 : 0, {
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [isActiveTrip, mapProg]);
+
+  useEffect(() => {
+    detailsProg.value = withTiming(detailsOpen ? 1 : 0, {
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [detailsOpen, detailsProg]);
+
+  const mapWrapAnimated = useAnimatedStyle(() => ({
+    transform: [
+      { scale: interpolate(mapProg.value, [0, 1], [0.96, 1], Extrapolation.CLAMP) },
+      { translateY: interpolate(mapProg.value, [0, 1], [24, 0], Extrapolation.CLAMP) },
+    ],
+    opacity: interpolate(mapProg.value, [0, 1], [0, 1], Extrapolation.CLAMP),
+    borderRadius: interpolate(mapProg.value, [0, 1], [16, 0], Extrapolation.CLAMP),
+    overflow: 'hidden',
+  }));
+
+  const fabAnimated = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(detailsProg.value, [0, 1], [0, 30], Extrapolation.CLAMP) },
+      { scale: interpolate(detailsProg.value, [0, 1], [1, 0.92], Extrapolation.CLAMP) },
+    ],
+    opacity: interpolate(detailsProg.value, [0, 1], [1, 0], Extrapolation.CLAMP),
+  }));
+
+  const sheetAnimated = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(detailsProg.value, [0, 1], [40, 0], Extrapolation.CLAMP) },
+    ],
+    opacity: interpolate(detailsProg.value, [0, 1], [0, 1], Extrapolation.CLAMP),
+  }));
 
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -109,15 +160,21 @@ export default function TripScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!isActiveTrip || !currentStats?.id) {return;}
+      if (!isActiveTrip || !currentStats?.id) {
+        return;
+      }
       try {
         const res = await getTripWithPoints(currentStats.id);
-        if (!res || cancelled) {return;}
+        if (!res || cancelled) {
+          return;
+        }
         const coords = res.points.map((p) => [p.lng, p.lat] as [number, number]);
         setRoute(coords);
         setStartCoord(coords.length > 0 ? coords[0] : null);
         setCurrentCoord(coords.length > 0 ? coords[coords.length - 1] : null);
-      } catch {}
+      } catch (e) {
+        console.warn('No se pudo cargar puntos de la ruta', e);
+      }
     })();
     return () => {
       cancelled = true;
@@ -188,7 +245,9 @@ export default function TripScreen() {
                   variant="solid"
                   action="primary"
                   onPress={async () => {
-                    if (!user) {return;}
+                    if (!user) {
+                      return;
+                    }
                     try {
                       await startTripTracking({ userId: user.id });
                       startTrip();
@@ -232,21 +291,26 @@ export default function TripScreen() {
       )}
 
       {isActiveTrip && (
-        <View style={{ flex: 1 }}>
+        <Animated.View style={[{ flex: 1 }, mapWrapAnimated]}>
           <TripMapView path={route} start={startCoord} current={currentCoord} />
 
-          {/* Floating toggle */}
-          {!detailsOpen ? (
-            <Pressable
-              style={[styles.fab, { bottom: tabBarHeight + 12 }]}
-              onPress={() => setDetailsOpen(true)}
-              accessibilityLabel="Mostrar detalles de la carrera"
+          {!detailsOpen && (
+            <Animated.View style={[styles.fab, { bottom: tabBarHeight + 12 }, fabAnimated]}>
+              <Pressable
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+                onPress={() => setDetailsOpen(true)}
+                accessibilityLabel="Mostrar detalles de la carrera"
+              >
+                <Ionicons name="chevron-up" size={22} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 6 }}>Detalles</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+
+          {detailsOpen && (
+            <Animated.View
+              style={[styles.bottomSheet, { bottom: tabBarHeight + 4 }, sheetAnimated]}
             >
-              <Ionicons name="chevron-up" size={22} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 6 }}>Detalles</Text>
-            </Pressable>
-          ) : (
-            <View style={[styles.bottomSheet, { bottom: tabBarHeight + 4 }]}>
               <Pressable
                 style={styles.sheetHandle}
                 onPress={() => setDetailsOpen(false)}
@@ -255,9 +319,9 @@ export default function TripScreen() {
                 <Ionicons name="chevron-down" size={20} color="#6b7280" />
               </Pressable>
               {ActiveTripDetails}
-            </View>
+            </Animated.View>
           )}
-        </View>
+        </Animated.View>
       )}
 
       <FareModal
