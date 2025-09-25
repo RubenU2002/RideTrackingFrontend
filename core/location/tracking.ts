@@ -120,7 +120,7 @@ export async function startTripTracking(opts: StartTripOptions): Promise<{ tripI
     throw new Error('Permisos de ubicación no concedidos');
   }
   log.info('Starting trip tracking for user', opts.userId);
-  const start = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+  const start = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
   const tripId = cuid();
   await createLocalTrip({
     id: tripId,
@@ -143,7 +143,7 @@ export async function startTripTracking(opts: StartTripOptions): Promise<{ tripI
     opts.distanceIntervalM ?? DEFAULT_DISTANCE_INTERVAL_M,
   );
   await Location.startLocationUpdatesAsync(TASK_NAME, {
-    accuracy: Location.Accuracy.Balanced,
+    accuracy: Location.Accuracy.High,
     timeInterval: opts.timeIntervalMs ?? DEFAULT_TIME_INTERVAL_MS,
     distanceInterval: opts.distanceIntervalM ?? DEFAULT_DISTANCE_INTERVAL_M,
     showsBackgroundLocationIndicator: false,
@@ -164,7 +164,7 @@ export async function stopTripTracking(params: {
   platform: Platform;
   notes?: string;
 }): Promise<{ queued: boolean; body?: CreateTripDto }> {
-  const end = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+  const end = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
   const active = await getActiveTrip();
   if (!active) {
     return { queued: false };

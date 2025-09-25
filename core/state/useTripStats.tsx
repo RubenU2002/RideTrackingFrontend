@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { getActiveTrip } from '@/core/storage/tripRepo';
-import { getDb } from '@/core/storage/sqlite';
-import { haversineKm } from '@/features/heatmap/recommendation';
 import { setStatsUpdateCallback } from '@/core/location/tracking';
+import { getDb } from '@/core/storage/sqlite';
+import { getActiveTrip } from '@/core/storage/tripRepo';
+import { haversineKm } from '@/features/heatmap/recommendation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CurrentTripStats, TripPoint } from './tripStore';
 
 type TripStatsHookResult = {
@@ -20,7 +20,9 @@ export function useTripStats(): TripStatsHookResult {
   const refreshStatsRef = useRef<() => Promise<void>>(async () => {});
 
   const calculateDistance = useCallback((points: TripPoint[]): number => {
-    if (points.length < 2) {return 0;}
+    if (points.length < 2) {
+      return 0;
+    }
 
     let totalDistance = 0;
     for (let i = 1; i < points.length; i++) {
@@ -30,7 +32,9 @@ export function useTripStats(): TripStatsHookResult {
   }, []);
 
   const refreshStats = useCallback(async () => {
-    if (isRefreshingRef.current) {return;}
+    if (isRefreshingRef.current) {
+      return;
+    }
     isRefreshingRef.current = true;
 
     try {
@@ -46,13 +50,43 @@ export function useTripStats(): TripStatsHookResult {
         lat: number;
         lng: number;
         ts: number;
-      }>('SELECT lat, lng, ts FROM trip_points WHERE tripId = ? ORDER BY ts ASC', [activeTrip.id]);
+        speed?: number | null;
+      }>('SELECT lat, lng, ts, speed FROM trip_points WHERE tripId = ? ORDER BY ts ASC', [
+        activeTrip.id,
+      ]);
 
       const points: TripPoint[] = pointsResult.map((p) => ({
         lat: p.lat,
         lng: p.lng,
         ts: p.ts,
       }));
+      let currentSpeedKmh = 0;
+      if (pointsResult.length > 0) {
+        const last = pointsResult[pointsResult.length - 1];
+        if (
+          last.speed !== null &&
+          last.speed !== undefined &&
+          Number.isFinite(last.speed) &&
+          last.speed >= 0
+        ) {
+          currentSpeedKmh = last.speed * 3.6;
+        } else if (points.length >= 2) {
+          const speeds: number[] = [];
+          const take = Math.min(points.length - 1, 3);
+          for (let i = 0; i < take; i++) {
+            const a = points[points.length - 2 - i];
+            const b = points[points.length - 1 - i];
+            const dtSec = Math.max(0, (b.ts - a.ts) / 1000);
+            if (dtSec > 0 && dtSec < 60) {
+              const dk = haversineKm(a, b);
+              speeds.push(dk / (dtSec / 3600));
+            }
+          }
+          if (speeds.length > 0) {
+            currentSpeedKmh = speeds.reduce((a, v) => a + v, 0) / speeds.length;
+          }
+        }
+      }
 
       const newStats: CurrentTripStats = {
         id: activeTrip.id,
@@ -60,6 +94,7 @@ export function useTripStats(): TripStatsHookResult {
         pointsCount: points.length,
         distanceKm: calculateDistance(points),
         lastPoint: points.length > 0 ? points[points.length - 1] : undefined,
+        currentSpeedKmh,
       };
 
       setCurrentStats((prevStats) => {

@@ -33,6 +33,8 @@ export type CurrentTripStats = {
   pointsCount: number;
   distanceKm: number;
   lastPoint?: TripPoint;
+  // Velocidad instantánea estimada (km/h) basada en el último punto o segmento
+  currentSpeedKmh?: number;
 };
 
 type State = {

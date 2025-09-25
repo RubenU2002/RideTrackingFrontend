@@ -103,7 +103,10 @@ export default function TripScreen() {
               <Text style={[styles.timer, { color: textColor }]}>{formatElapsed(elapsed)}</Text>
               <View style={styles.metricsRow}>
                 <Metric label="Distancia" value={`${distanceKm.toFixed(2)} km`} />
-                <Metric label="Velocidad" value={`${avgSpeedKmh.toFixed(1)} km/h`} />
+                <Metric
+                  label="Velocidad"
+                  value={`${(currentStats?.currentSpeedKmh ?? avgSpeedKmh).toFixed(1)} km/h`}
+                />
                 <Metric label="Puntos" value={`${pointsCount}`} />
               </View>
               <Button
