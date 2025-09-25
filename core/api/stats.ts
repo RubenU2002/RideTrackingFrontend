@@ -1,4 +1,5 @@
 import { api } from '@/core/api/client';
+import { getTodayInColombia } from '@/core/utils/timezone';
 
 export type TripStatistics = {
   totalTrips: number;
@@ -94,10 +95,14 @@ function pickSummary(
   map: Record<string, DailySummary>,
   requestedIso?: string,
 ): DailySummary | null {
-  if (requestedIso && map[requestedIso]) {return map[requestedIso];}
+  if (requestedIso && map[requestedIso]) {
+    return map[requestedIso];
+  }
   // fallback: pick the most recent date (max iso)
   const keys = Object.keys(map);
-  if (keys.length === 0) {return null;}
+  if (keys.length === 0) {
+    return null;
+  }
   const mostRecent = keys.sort().at(-1)!; // ISO dates sort lexicographically by time
   return map[mostRecent];
 }
@@ -108,7 +113,9 @@ export const statsApi = {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
-        if (v) {searchParams.set(k, v);}
+        if (v) {
+          searchParams.set(k, v);
+        }
       });
     }
     const qs = searchParams.toString();
@@ -123,7 +130,7 @@ export const statsApi = {
 
   // Consume el nuevo backend y transforma al contrato del front
   getExtended: async (isoDate?: string): Promise<ExtendedStatsResponse> => {
-    const date = isoDate || new Date().toISOString().slice(0, 10);
+    const date = isoDate || getTodayInColombia();
     const res = await api.get<BackendStatsResponse>(
       `/api/v1/statistics?date=${encodeURIComponent(date)}`,
     );

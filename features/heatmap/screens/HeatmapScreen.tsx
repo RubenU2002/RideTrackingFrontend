@@ -1,16 +1,17 @@
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useTripStats } from '@/core/state/useTripStats';
+import { getCurrentHourInColombia } from '@/core/utils/timezone';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { ThemedView } from '@/components/ThemedView';
-import { ThemedText } from '@/components/ThemedText';
-import { Card } from '@/components/ui/Card';
 import { HeatmapView } from '../components/HeatmapView';
 import { defaultHotspots, mockHotspotsByHour } from '../mock';
-import { Button } from '@/components/ui/Button';
 import { quickRecommendation } from '../recommendation';
-import { useTripStats } from '@/core/state/useTripStats';
 
 export default function HeatmapScreen() {
-  const hour = new Date().getHours();
+  const hour = getCurrentHourInColombia();
   const hotspots = useMemo(() => mockHotspotsByHour[hour] ?? defaultHotspots, [hour]);
   const { currentStats } = useTripStats();
 

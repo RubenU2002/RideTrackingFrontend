@@ -1,13 +1,14 @@
-import { getDb } from '@/core/storage/sqlite';
-import {
-  getPendingCompletedTrips,
-  markTripSynced,
-  deleteTripCascade,
-} from '@/core/storage/tripRepo';
-import type { DbPoint, DbTrip } from '@/core/storage/sqlite';
 import { tripsApi, type CreateTripDto } from '@/core/api/trips';
 import { API_BASE_URL } from '@/core/config/env';
+import type { DbPoint, DbTrip } from '@/core/storage/sqlite';
+import { getDb } from '@/core/storage/sqlite';
+import {
+  deleteTripCascade,
+  getPendingCompletedTrips,
+  markTripSynced,
+} from '@/core/storage/tripRepo';
 import { createLogger } from '@/core/utils/logger';
+import { nowInColombia, toColombiaISO } from '@/core/utils/timezone';
 import { isValidPlatform, mapLegacyPlatform } from '../utils/platform';
 
 const log = createLogger('Outbox');
@@ -71,8 +72,8 @@ function toCreateTripDto(trip: DbTrip, points: DbPoint[]): CreateTripDto | null 
 
   return {
     platform: platform,
-    startTime: new Date(trip.startTime).toISOString(),
-    endTime: new Date(trip.endTime).toISOString(),
+    startTime: toColombiaISO(trip.startTime),
+    endTime: toColombiaISO(trip.endTime),
     startLatitude: trip.startLat!,
     startLongitude: trip.startLng!,
     endLatitude: trip.endLat ?? undefined,
@@ -83,7 +84,7 @@ function toCreateTripDto(trip: DbTrip, points: DbPoint[]): CreateTripDto | null 
     points: points.map((p) => ({
       latitude: p.lat,
       longitude: p.lng,
-      timestamp: new Date(p.ts).toISOString(),
+      timestamp: toColombiaISO(p.ts),
       speed: p.speed ?? undefined,
       heading: p.heading ?? undefined,
       altitude: p.altitude ?? undefined,
@@ -154,7 +155,7 @@ export async function flushOutboxOnce(): Promise<{ sent: number; failed: number 
       log.error('Error sending outbox item', item.id, e);
       await db.runAsync(
         'UPDATE outbox SET attempts = attempts + 1, lastAttemptAt=? WHERE id=?',
-        Date.now(),
+        nowInColombia(),
         item.id,
       );
     }

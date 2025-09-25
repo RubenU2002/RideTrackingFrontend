@@ -1,19 +1,20 @@
-import * as TaskManager from 'expo-task-manager';
-import * as Location from 'expo-location';
-import cuid from 'cuid';
+import { Platform } from '@/core/api/Platform';
+import type { CreateTripDto } from '@/core/api/trips';
+import { DEFAULT_DISTANCE_INTERVAL_M, DEFAULT_TIME_INTERVAL_MS } from '@/core/location/config';
 import {
   addTripPoint,
   createLocalTrip,
+  deleteTripCascade,
   finalizeLocalTrip,
   getActiveTrip,
   getTripWithPoints,
-  deleteTripCascade,
 } from '@/core/storage/tripRepo';
-import { DEFAULT_DISTANCE_INTERVAL_M, DEFAULT_TIME_INTERVAL_MS } from '@/core/location/config';
 import { flushOutboxOnce, queueTripToOutbox } from '@/core/sync/outbox';
-import type { CreateTripDto } from '@/core/api/trips';
-import { Platform } from '@/core/api/Platform';
 import { createLogger, fmtCoord } from '@/core/utils/logger';
+import { nowInColombia, toColombiaISO } from '@/core/utils/timezone';
+import cuid from 'cuid';
+import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 
 export const TASK_NAME = 'TRIP_TRACKING';
 const log = createLogger('Tracking');
@@ -30,7 +31,7 @@ export function setStatsUpdateCallback(callback: TripStatsUpdateCallback | null)
 }
 
 function notifyStatsUpdate() {
-  const now = Date.now();
+  const now = nowInColombia();
   if (statsUpdateCallback && now - lastNotificationTime > NOTIFICATION_THROTTLE_MS) {
     lastNotificationTime = now;
     statsUpdateCallback();
@@ -62,7 +63,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       continue;
     }
     const tsRaw = typeof timestamp === 'number' ? timestamp : new Date(timestamp).getTime();
-    const ts = Number.isFinite(tsRaw) ? tsRaw : Date.now();
+    const ts = Number.isFinite(tsRaw) ? tsRaw : nowInColombia();
     const norm = (v: number | null | undefined) =>
       v === null || v === undefined || !Number.isFinite(v) || v < 0 ? null : v;
     const prev = lastPointByTrip.get(active.id);
@@ -125,7 +126,7 @@ export async function startTripTracking(opts: StartTripOptions): Promise<{ tripI
     id: tripId,
     userId: opts.userId,
     platform: opts.platform,
-    startTime: Date.now(),
+    startTime: nowInColombia(),
     startLat: start.coords.latitude,
     startLng: start.coords.longitude,
   });
@@ -171,7 +172,7 @@ export async function stopTripTracking(params: {
 
   await finalizeLocalTrip({
     tripId: active.id,
-    endTime: Date.now(),
+    endTime: nowInColombia(),
     endLat: end.coords.latitude,
     endLng: end.coords.longitude,
     amount: params.amount,
@@ -210,8 +211,8 @@ export async function stopTripTracking(params: {
 
   const body: CreateTripDto = {
     platform: t.trip.platform,
-    startTime: new Date(t.trip.startTime).toISOString(),
-    endTime: new Date(t.trip.endTime).toISOString(),
+    startTime: toColombiaISO(t.trip.startTime),
+    endTime: toColombiaISO(t.trip.endTime),
     startLatitude: t.trip.startLat ?? 0,
     startLongitude: t.trip.startLng ?? 0,
     endLatitude: t.trip.endLat ?? undefined,
@@ -222,7 +223,7 @@ export async function stopTripTracking(params: {
     points: t.points.map((p) => ({
       latitude: p.lat,
       longitude: p.lng,
-      timestamp: new Date(p.ts).toISOString(),
+      timestamp: toColombiaISO(p.ts),
       speed:
         p.speed !== null && p.speed !== undefined && Number.isFinite(p.speed) && p.speed >= 0
           ? p.speed

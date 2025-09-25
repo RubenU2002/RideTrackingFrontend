@@ -1,5 +1,6 @@
 import { Platform } from '@/core/api/Platform';
 import { getActiveTrip } from '@/core/storage/tripRepo';
+import { nowInColombia } from '@/core/utils/timezone';
 import React, {
   createContext,
   useCallback,
@@ -113,7 +114,7 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
   });
 
   const startTrip = useCallback(() => {
-    dispatch({ type: 'START_TRIP', id: `trip_${Date.now()}`, start: Date.now() });
+    dispatch({ type: 'START_TRIP', id: `trip_${nowInColombia()}`, start: nowInColombia() });
   }, []);
 
   const updateTripStats = useCallback((stats: CurrentTripStats) => {

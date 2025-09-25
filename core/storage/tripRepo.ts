@@ -1,6 +1,7 @@
-import { getDb, type DbPoint, type DbTrip } from '@/core/storage/sqlite';
 import { Platform } from '@/core/api/Platform';
+import { getDb, type DbPoint, type DbTrip } from '@/core/storage/sqlite';
 import { createLogger, fmtCoord } from '@/core/utils/logger';
+import { nowInColombia } from '@/core/utils/timezone';
 
 const log = createLogger('DB');
 
@@ -115,7 +116,7 @@ export async function getTripWithPoints(
 
 export async function markTripSynced(tripId: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync('UPDATE trips_local SET syncedAt=? WHERE id=?', Date.now(), tripId);
+  await db.runAsync('UPDATE trips_local SET syncedAt=? WHERE id=?', nowInColombia(), tripId);
   log.info('Marked trip synced', tripId);
 }
 

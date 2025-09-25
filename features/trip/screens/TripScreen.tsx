@@ -1,18 +1,19 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { Card } from '@/components/ui/Card';
+import { ThemedView } from '@/components/ThemedView';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Chip } from '@/components/ui/Chip';
+import { useAuth } from '@/core/auth/AuthContext';
+import { startTripTracking, stopTripTracking } from '@/core/location/tracking';
 import { useTripStore } from '@/core/state/tripStore';
 import { useTripStats } from '@/core/state/useTripStats';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { FareModal } from '../components/FareModal';
+import { getCurrentHourInColombia, nowInColombia } from '@/core/utils/timezone';
 import { HeatmapView } from '@/features/heatmap/components/HeatmapView';
 import { getHotspotsForHour, topRecommendations } from '@/features/heatmap/recommendation';
-import { Chip } from '@/components/ui/Chip';
-import { startTripTracking, stopTripTracking } from '@/core/location/tracking';
-import { useAuth } from '@/core/auth/AuthContext';
+import { useThemeColor } from '@/hooks/useThemeColor';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { FareModal } from '../components/FareModal';
 
 function formatElapsed(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -45,7 +46,7 @@ export default function TripScreen() {
 
       const updateElapsed = () => {
         if (startTimeRef.current) {
-          setElapsed(Date.now() - startTimeRef.current);
+          setElapsed(nowInColombia() - startTimeRef.current);
         }
       };
 
@@ -140,13 +141,13 @@ export default function TripScreen() {
 
         <Card>
           <ThemedText type="subtitle">Mapa de calor</ThemedText>
-          <HeatmapView hotspots={getHotspotsForHour(new Date().getHours())} />
+          <HeatmapView hotspots={getHotspotsForHour(getCurrentHourInColombia())} />
           <View style={{ height: 12 }} />
           <ThemedText type="subtitle">Recomendaciones</ThemedText>
           <View style={styles.chipsRow}>
             {topRecommendations(
               currentStats?.lastPoint ?? { lat: -33.4489, lng: -70.6693 },
-              new Date().getHours(),
+              getCurrentHourInColombia(),
               4,
             ).map((r) => (
               <Chip

@@ -2,6 +2,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { ExtendedStatsResponse, statsApi } from '@/core/api/stats';
 import { createLogger } from '@/core/utils/logger';
+import { getTodayInColombia } from '@/core/utils/timezone';
 import { Box } from '@gluestack-ui/themed';
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
@@ -19,7 +20,7 @@ export default function StatsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ExtendedStatsResponse['data'] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => getTodayInColombia());
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const fetchData = useCallback(async (iso?: string) => {
@@ -53,20 +54,27 @@ export default function StatsScreen() {
   };
   const nextDay = () => {
     const d = new Date(selectedDate + 'T00:00:00');
-    const today = new Date();
+    const todayString = getTodayInColombia();
     d.setDate(d.getDate() + 1);
-    if (d > today) {return;}
-    setSelectedDate(d.toISOString().slice(0, 10));
+    const nextDayString = d.toISOString().slice(0, 10);
+    if (nextDayString > todayString) {
+      return;
+    }
+    setSelectedDate(nextDayString);
   };
 
   const humanLabel = () => {
-    const sel = new Date(selectedDate + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (sel.getTime() === today.getTime()) {return 'Hoy';}
+    const todayString = getTodayInColombia();
+    if (selectedDate === todayString) {
+      return 'Hoy';
+    }
+
+    const today = new Date(todayString + 'T00:00:00');
     const ayer = new Date(today);
     ayer.setDate(today.getDate() - 1);
-    if (sel.getTime() === ayer.getTime()) {return 'Ayer';}
+    if (selectedDate === ayer.toISOString().slice(0, 10)) {
+      return 'Ayer';
+    }
     const meses = [
       'enero',
       'febrero',
@@ -81,6 +89,7 @@ export default function StatsScreen() {
       'noviembre',
       'diciembre',
     ];
+    const sel = new Date(selectedDate + 'T00:00:00');
     return `${sel.getDate()} ${meses[sel.getMonth()]} ${sel.getFullYear()}`;
   };
 
@@ -97,7 +106,7 @@ export default function StatsScreen() {
             onPrev={prevDay}
             onNext={nextDay}
             onOpenCalendar={() => setCalendarOpen(true)}
-            disableNext={selectedDate === new Date().toISOString().slice(0, 10)}
+            disableNext={selectedDate === getTodayInColombia()}
           />
           {loading && <ThemedText style={styles.loading}>Cargando…</ThemedText>}
           {error && !loading && <ThemedText style={styles.error}>{error}</ThemedText>}
