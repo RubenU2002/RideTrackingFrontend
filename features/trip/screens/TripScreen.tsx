@@ -12,8 +12,11 @@ import { HeatmapView } from '@/features/heatmap/components/HeatmapView';
 import { getHotspotsForHour, topRecommendations } from '@/features/heatmap/recommendation';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, ScrollView } from 'react-native';
 import { FareModal } from '../components/FareModal';
+import { Ionicons } from '@expo/vector-icons';
+import { Button as GSButton, ButtonText } from '@gluestack-ui/themed';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 function formatElapsed(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -24,6 +27,7 @@ function formatElapsed(ms: number) {
 }
 
 export default function TripScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
   const { isActiveTrip, startTrip, endTrip, cancelTrip, checkActiveTrip } = useTripStore();
   const { currentStats, refreshStats } = useTripStats();
   const { user } = useAuth();
@@ -96,7 +100,10 @@ export default function TripScreen() {
           {isActiveTrip ? 'Tracking activo' : 'Listo para iniciar'}
         </ThemedText>
       </View>
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 16 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Card style={styles.card}>
           {isActiveTrip ? (
             <>
@@ -110,52 +117,67 @@ export default function TripScreen() {
                 <Metric label="Puntos" value={`${pointsCount}`} />
               </View>
               <View style={styles.actionsRow}>
-                <Button
-                  title="Terminar"
-                  variant="danger"
-                  size="lg"
-                  onPress={() => setShowModal(true)}
-                  style={{ alignSelf: 'stretch', flex: 1 }}
-                />
-                <Button
-                  title="Cancelar"
-                  variant="secondary"
-                  size="lg"
-                  onPress={async () => {
-                    try {
-                      await cancelTripTracking();
-                      cancelTrip();
-                      await checkActiveTrip();
-                      await refreshStats();
-                    } catch (e) {
-                      console.warn('No se pudo cancelar el viaje', e);
-                    }
-                  }}
-                  style={{ alignSelf: 'stretch', flex: 1 }}
-                />
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Terminar"
+                    variant="danger"
+                    size="lg"
+                    onPress={() => setShowModal(true)}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Cancelar"
+                    variant="secondary"
+                    size="lg"
+                    onPress={async () => {
+                      try {
+                        await cancelTripTracking();
+                        cancelTrip();
+                        await checkActiveTrip();
+                        await refreshStats();
+                      } catch (e) {
+                        console.warn('No se pudo cancelar el viaje', e);
+                      }
+                    }}
+                  />
+                </View>
               </View>
             </>
           ) : (
             <>
-              <ThemedText>Presiona para iniciar el seguimiento de tu carrera</ThemedText>
-              <Button
-                title="Empezar carrera"
-                size="lg"
-                onPress={async () => {
-                  if (!user) {
-                    return;
-                  }
-                  try {
-                    await startTripTracking({ userId: user.id });
-                    startTrip();
-                    await checkActiveTrip();
-                    await refreshStats();
-                  } catch (e) {
-                    console.warn('No se pudo iniciar tracking', e);
-                  }
-                }}
-                style={{ marginTop: 16, alignSelf: 'stretch' }}
-              />
+              <View style={styles.startHero}>
+                <View style={styles.startIconWrap}>
+                  <Ionicons name="navigate" size={28} color="#0a84ff" />
+                </View>
+                <ThemedText type="title">Listo para empezar</ThemedText>
+                <ThemedText style={{ opacity: 0.7, textAlign: 'center' }}>
+                  Presiona el botón cuando estés listo para iniciar tu carrera.
+                </ThemedText>
+                <GSButton
+                  size="lg"
+                  variant="solid"
+                  action="primary"
+                  onPress={async () => {
+                    if (!user) {
+                      return;
+                    }
+                    try {
+                      await startTripTracking({ userId: user.id });
+                      startTrip();
+                      await checkActiveTrip();
+                      await refreshStats();
+                    } catch (e) {
+                      console.warn('No se pudo iniciar tracking', e);
+                    }
+                  }}
+                  accessibilityLabel="Empezar carrera"
+                  sx={{ alignSelf: 'stretch', mt: 16 }}
+                >
+                  <Ionicons name="play" size={18} color="#fff" />
+                  <ButtonText style={{ marginLeft: 8 }}>Empezar carrera</ButtonText>
+                </GSButton>
+              </View>
             </>
           )}
         </Card>
@@ -180,7 +202,7 @@ export default function TripScreen() {
             ))}
           </View>
         </Card>
-      </View>
+      </ScrollView>
 
       <FareModal
         visible={showModal}
@@ -216,6 +238,20 @@ const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
     gap: 8,
+  },
+  startHero: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    gap: 10,
+  },
+  startIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10,132,255,0.12)',
+    marginBottom: 4,
   },
   timer: {
     fontSize: 42,

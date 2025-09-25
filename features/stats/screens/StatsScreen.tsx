@@ -19,10 +19,12 @@ import {
   EarningsPerTripBarsSkeleton,
   PlatformPieSkeleton,
 } from '../components/StatsSkeleton';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 const log = createLogger('StatsScreen');
 
 export default function StatsScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ExtendedStatsResponse['data'] | null>(null);
@@ -110,7 +112,7 @@ export default function StatsScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: tabBarHeight + 16 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <Box style={styles.stack}>
