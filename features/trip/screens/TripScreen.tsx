@@ -4,19 +4,21 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { useAuth } from '@/core/auth/AuthContext';
-import { startTripTracking, stopTripTracking, cancelTripTracking } from '@/core/location/tracking';
+import { cancelTripTracking, startTripTracking, stopTripTracking } from '@/core/location/tracking';
 import { useTripStore } from '@/core/state/tripStore';
 import { useTripStats } from '@/core/state/useTripStats';
+import { getTripWithPoints } from '@/core/storage/tripRepo';
 import { getCurrentHourInColombia, nowInColombia } from '@/core/utils/timezone';
 import { HeatmapView } from '@/features/heatmap/components/HeatmapView';
 import { getHotspotsForHour, topRecommendations } from '@/features/heatmap/recommendation';
+import { TripMapView } from '@/features/trip/components/TripMapView';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
-import { FareModal } from '../components/FareModal';
 import { Ionicons } from '@expo/vector-icons';
-import { Button as GSButton, ButtonText } from '@gluestack-ui/themed';
+import { ButtonText, Button as GSButton } from '@gluestack-ui/themed';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FareModal } from '../components/FareModal';
 
 function formatElapsed(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -36,6 +38,10 @@ export default function TripScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [selectedRec, setSelectedRec] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [route, setRoute] = useState<[number, number][]>([]); // [lng, lat]
+  const [startCoord, setStartCoord] = useState<[number, number] | null>(null);
+  const [currentCoord, setCurrentCoord] = useState<[number, number] | null>(null);
 
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -90,62 +96,85 @@ export default function TripScreen() {
     [bg],
   );
 
+  useEffect(() => {
+    if (!isActiveTrip) {
+      setDetailsOpen(false);
+      setRoute([]);
+      setStartCoord(null);
+      setCurrentCoord(null);
+    }
+  }, [isActiveTrip]);
+
+  // Refresh route path points whenever the count updates (during active trip)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isActiveTrip || !currentStats?.id) {return;}
+      try {
+        const res = await getTripWithPoints(currentStats.id);
+        if (!res || cancelled) {return;}
+        const coords = res.points.map((p) => [p.lng, p.lat] as [number, number]);
+        setRoute(coords);
+        setStartCoord(coords.length > 0 ? coords[0] : null);
+        setCurrentCoord(coords.length > 0 ? coords[coords.length - 1] : null);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isActiveTrip, currentStats?.id, currentStats?.pointsCount]);
+
+  const ActiveTripDetails = (
+    <Card style={[styles.card, { paddingBottom: 8 }]}>
+      <Text style={[styles.timer, { color: textColor }]}>{formatElapsed(elapsed)}</Text>
+      <View style={styles.metricsRow}>
+        <Metric label="Distancia" value={`${distanceKm.toFixed(2)} km`} />
+        <Metric
+          label="Velocidad"
+          value={`${(currentStats?.currentSpeedKmh ?? avgSpeedKmh).toFixed(1)} km/h`}
+        />
+        <Metric label="Puntos" value={`${pointsCount}`} />
+      </View>
+      <View style={styles.actionsRow}>
+        <View style={{ flex: 1 }}>
+          <Button title="Terminar" variant="danger" size="lg" onPress={() => setShowModal(true)} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button
+            title="Cancelar"
+            variant="secondary"
+            size="lg"
+            onPress={async () => {
+              try {
+                await cancelTripTracking();
+                cancelTrip();
+                await checkActiveTrip();
+                await refreshStats();
+              } catch (e) {
+                console.warn('No se pudo cancelar el viaje', e);
+              }
+            }}
+          />
+        </View>
+      </View>
+    </Card>
+  );
+
   return (
     <ThemedView style={styles.container}>
-      <View style={[styles.header, headerAccent]}>
-        <ThemedText type="title">
-          {isActiveTrip ? 'Carrera en progreso' : 'Empezar carrera'}
-        </ThemedText>
-        <ThemedText type="subtitle" style={styles.subtitle}>
-          {isActiveTrip ? 'Tracking activo' : 'Listo para iniciar'}
-        </ThemedText>
-      </View>
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 16 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Card style={styles.card}>
-          {isActiveTrip ? (
-            <>
-              <Text style={[styles.timer, { color: textColor }]}>{formatElapsed(elapsed)}</Text>
-              <View style={styles.metricsRow}>
-                <Metric label="Distancia" value={`${distanceKm.toFixed(2)} km`} />
-                <Metric
-                  label="Velocidad"
-                  value={`${(currentStats?.currentSpeedKmh ?? avgSpeedKmh).toFixed(1)} km/h`}
-                />
-                <Metric label="Puntos" value={`${pointsCount}`} />
-              </View>
-              <View style={styles.actionsRow}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Terminar"
-                    variant="danger"
-                    size="lg"
-                    onPress={() => setShowModal(true)}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Cancelar"
-                    variant="secondary"
-                    size="lg"
-                    onPress={async () => {
-                      try {
-                        await cancelTripTracking();
-                        cancelTrip();
-                        await checkActiveTrip();
-                        await refreshStats();
-                      } catch (e) {
-                        console.warn('No se pudo cancelar el viaje', e);
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-            </>
-          ) : (
-            <>
+      {!isActiveTrip && (
+        <>
+          <View style={[styles.header, headerAccent]}>
+            <ThemedText type="title">Empezar carrera</ThemedText>
+            <ThemedText type="subtitle" style={styles.subtitle}>
+              Listo para iniciar
+            </ThemedText>
+          </View>
+          <ScrollView
+            contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 16 }]}
+            showsVerticalScrollIndicator={false}
+          >
+            <Card style={styles.card}>
               <View style={styles.startHero}>
                 <View style={styles.startIconWrap}>
                   <Ionicons name="navigate" size={28} color="#0a84ff" />
@@ -159,9 +188,7 @@ export default function TripScreen() {
                   variant="solid"
                   action="primary"
                   onPress={async () => {
-                    if (!user) {
-                      return;
-                    }
+                    if (!user) {return;}
                     try {
                       await startTripTracking({ userId: user.id });
                       startTrip();
@@ -178,31 +205,60 @@ export default function TripScreen() {
                   <ButtonText style={{ marginLeft: 8 }}>Empezar carrera</ButtonText>
                 </GSButton>
               </View>
-            </>
-          )}
-        </Card>
+            </Card>
 
-        <Card>
-          <ThemedText type="subtitle">Mapa de calor</ThemedText>
-          <HeatmapView hotspots={getHotspotsForHour(getCurrentHourInColombia())} />
-          <View style={{ height: 12 }} />
-          <ThemedText type="subtitle">Recomendaciones</ThemedText>
-          <View style={styles.chipsRow}>
-            {topRecommendations(
-              currentStats?.lastPoint ?? { lat: -33.4489, lng: -70.6693 },
-              getCurrentHourInColombia(),
-              4,
-            ).map((r) => (
-              <Chip
-                key={r.name}
-                label={`${r.name} · ${r.etaMin}m`}
-                selected={selectedRec === r.name}
-                onPress={() => setSelectedRec(r.name)}
-              />
-            ))}
-          </View>
-        </Card>
-      </ScrollView>
+            <Card>
+              <ThemedText type="subtitle">Mapa de calor</ThemedText>
+              <HeatmapView hotspots={getHotspotsForHour(getCurrentHourInColombia())} />
+              <View style={{ height: 12 }} />
+              <ThemedText type="subtitle">Recomendaciones</ThemedText>
+              <View style={styles.chipsRow}>
+                {topRecommendations(
+                  currentStats?.lastPoint ?? { lat: -33.4489, lng: -70.6693 },
+                  getCurrentHourInColombia(),
+                  4,
+                ).map((r) => (
+                  <Chip
+                    key={r.name}
+                    label={`${r.name} · ${r.etaMin}m`}
+                    selected={selectedRec === r.name}
+                    onPress={() => setSelectedRec(r.name)}
+                  />
+                ))}
+              </View>
+            </Card>
+          </ScrollView>
+        </>
+      )}
+
+      {isActiveTrip && (
+        <View style={{ flex: 1 }}>
+          <TripMapView path={route} start={startCoord} current={currentCoord} />
+
+          {/* Floating toggle */}
+          {!detailsOpen ? (
+            <Pressable
+              style={[styles.fab, { bottom: tabBarHeight + 12 }]}
+              onPress={() => setDetailsOpen(true)}
+              accessibilityLabel="Mostrar detalles de la carrera"
+            >
+              <Ionicons name="chevron-up" size={22} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 6 }}>Detalles</Text>
+            </Pressable>
+          ) : (
+            <View style={[styles.bottomSheet, { bottom: tabBarHeight + 4 }]}>
+              <Pressable
+                style={styles.sheetHandle}
+                onPress={() => setDetailsOpen(false)}
+                accessibilityLabel="Ocultar detalles"
+              >
+                <Ionicons name="chevron-down" size={20} color="#6b7280" />
+              </Pressable>
+              {ActiveTripDetails}
+            </View>
+          )}
+        </View>
+      )}
 
       <FareModal
         visible={showModal}
@@ -271,6 +327,40 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   chipsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 8 },
+  fab: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 24,
+    height: 44,
+    backgroundColor: '#2D7FF9',
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  bottomSheet: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 8,
+    paddingBottom: 8,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
 });
 
 function Metric({ label, value }: { label: string; value: string }) {
