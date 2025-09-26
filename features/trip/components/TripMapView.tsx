@@ -1,3 +1,4 @@
+import { MapSkeleton } from '@/components/ui/MapSkeleton';
 import { Palette } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useIsFocused } from '@react-navigation/native';
@@ -26,6 +27,8 @@ export function TripMapView({
   const [afterInteractions, setAfterInteractions] = useState(false);
   const isFocused = useIsFocused();
   const [lazyReady, setLazyReady] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
   const onLayout = (e: any) => {
     const { width, height } = e.nativeEvent.layout;
     if (width && height && (width !== dims.w || height !== dims.h)) {
@@ -40,7 +43,9 @@ export function TripMapView({
     let cancelled = false;
     if (isFocused) {
       const t = setTimeout(() => {
-        if (!cancelled) {setLazyReady(true);}
+        if (!cancelled) {
+          setLazyReady(true);
+        }
       }, 120);
       return () => {
         cancelled = true;
@@ -51,6 +56,24 @@ export function TripMapView({
     }
   }, [isFocused]);
 
+  const shouldMountMap = afterInteractions && lazyReady && dims.w > 0 && dims.h > 0;
+
+  useEffect(() => {
+    if (!shouldMountMap) {
+      setMapLoaded(false);
+      setShowSkeleton(true);
+    }
+  }, [shouldMountMap]);
+
+  useEffect(() => {
+    if (!mapLoaded) {
+      setShowSkeleton(true);
+      return;
+    }
+    const timeout = setTimeout(() => setShowSkeleton(false), 120);
+    return () => clearTimeout(timeout);
+  }, [mapLoaded]);
+
   // Style URL per theme or custom env
   const styleURLRef = useRef<string>('');
   const envStyle = process.env.EXPO_PUBLIC_MAPBOX_STYLE_URL;
@@ -59,11 +82,15 @@ export function TripMapView({
     : isDark
       ? 'mapbox://styles/mapbox/dark-v11'
       : 'mapbox://styles/mapbox/light-v11';
-  if (styleURLRef.current !== desiredStyle) {styleURLRef.current = desiredStyle;}
+  if (styleURLRef.current !== desiredStyle) {
+    styleURLRef.current = desiredStyle;
+  }
 
   // GeoJSON sources
   const line: Feature<LineString> | undefined = useMemo(() => {
-    if (!path || path.length < 2) {return undefined;}
+    if (!path || path.length < 2) {
+      return undefined;
+    }
     return {
       type: 'Feature',
       properties: {},
@@ -91,7 +118,9 @@ export function TripMapView({
           geometry: { type: 'Point', coordinates: current },
         });
       }
-      if (feats.length === 0) {return undefined;}
+      if (feats.length === 0) {
+        return undefined;
+      }
       return { type: 'FeatureCollection', features: feats };
     }, [start, current]);
 
@@ -124,13 +153,17 @@ export function TripMapView({
 
   return (
     <View style={[styles.map, { backgroundColor: bg }]} onLayout={onLayout}>
-      {afterInteractions && lazyReady && dims.w > 0 && dims.h > 0 && (
+      {showSkeleton && <MapSkeleton isDark={isDark} />}
+      {shouldMountMap && (
         <MapboxGL.MapView
           styleURL={styleURLRef.current}
           style={StyleSheet.absoluteFill}
           compassEnabled={false}
           scaleBarEnabled={false}
-          logoEnabled={false}
+          logoEnabled
+          logoPosition={{ bottom: 12, left: 12 }}
+          onWillStartLoadingMap={() => setMapLoaded(false)}
+          onDidFinishLoadingMap={() => setMapLoaded(true)}
         >
           <MapboxGL.Camera ref={cameraRef} />
           {/* Live user puck */}

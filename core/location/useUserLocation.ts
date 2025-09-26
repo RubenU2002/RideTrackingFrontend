@@ -20,45 +20,119 @@ export function useUserLocation(options?: { requestOnMount?: boolean }) {
     }
   }, []);
 
-  const requestPermissionAndGetCurrent = useCallback(async () => {
+  const ensureForegroundPermission = useCallback(async () => {
     try {
-      const perm = await Location.getForegroundPermissionsAsync();
-      let granted = perm.granted;
-      if (!granted) {
-        const req = await Location.requestForegroundPermissionsAsync();
-        granted = req.granted;
+      const current = await Location.getForegroundPermissionsAsync();
+      if (current.granted) {
+        setHasPermission(true);
+        return true;
       }
-      setHasPermission(granted);
-      if (granted) {
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      if (!current.canAskAgain) {
+        setHasPermission(false);
+        return false;
       }
-      return granted;
+      const requested = await Location.requestForegroundPermissionsAsync();
+      setHasPermission(requested.granted);
+      return requested.granted;
     } catch (e: any) {
       setError(e?.message ?? 'location_error');
       return false;
     }
   }, []);
 
+  const waitForSinglePosition = useCallback(async () => {
+    try {
+      const result = await new Promise<LatLng>((resolve, reject) => {
+        let cleaned = false;
+        let subscription: Location.LocationSubscription | null = null;
+        const timeout = setTimeout(() => {
+          if (cleaned) {
+            return;
+          }
+          cleaned = true;
+          if (subscription) {
+            subscription.remove();
+          }
+          reject(new Error('timeout'));
+        }, 7000);
+
+        Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            distanceInterval: 0,
+            mayShowUserSettingsDialog: true,
+          },
+          (pos) => {
+            if (cleaned) {
+              return;
+            }
+            cleaned = true;
+            clearTimeout(timeout);
+            if (subscription) {
+              subscription.remove();
+            }
+            resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          },
+        )
+          .then((sub) => {
+            subscription = sub;
+            if (cleaned) {
+              subscription.remove();
+            }
+          })
+          .catch((err) => {
+            if (cleaned) {
+              return;
+            }
+            cleaned = true;
+            clearTimeout(timeout);
+            if (subscription) {
+              subscription.remove();
+            }
+            reject(err);
+          });
+      });
+      return result;
+    } catch (err: any) {
+      throw err;
+    }
+  }, []);
+
+  const requestPermissionAndGetCurrent = useCallback(async () => {
+    const granted = await ensureForegroundPermission();
+    if (!granted) {
+      return false;
+    }
+    try {
+      const next = await waitForSinglePosition();
+      setCoords(next);
+      return true;
+    } catch (e: any) {
+      setError(e?.message ?? 'location_error');
+      return false;
+    }
+  }, [ensureForegroundPermission, waitForSinglePosition]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       await refreshLastKnown();
-      if (!mounted) {return;}
-      if (requestOnMount) {
-        await requestPermissionAndGetCurrent();
-      } else {
-        const fg = await Location.getForegroundPermissionsAsync();
-        if (!mounted) {return;}
-        setHasPermission(fg.granted);
+      if (!mounted) {
+        return;
+      }
+      const fg = await Location.getForegroundPermissionsAsync();
+      if (!mounted) {
+        return;
+      }
+      setHasPermission(fg.granted);
+      if (requestOnMount && !fg.granted && fg.canAskAgain) {
+        await ensureForegroundPermission();
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [refreshLastKnown, requestOnMount, requestPermissionAndGetCurrent]);
+  }, [refreshLastKnown, requestOnMount, ensureForegroundPermission]);
 
   return {
     coords,
@@ -66,5 +140,6 @@ export function useUserLocation(options?: { requestOnMount?: boolean }) {
     hasPermission,
     refreshLastKnown,
     requestPermissionAndGetCurrent,
+    ensureForegroundPermission,
   } as const;
 }

@@ -1,3 +1,4 @@
+import { MapSkeleton } from '@/components/ui/MapSkeleton';
 import { Palette } from '@/constants/Colors';
 import { useUserLocation } from '@/core/location/useUserLocation';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -7,6 +8,8 @@ import type { FeatureCollection, Point } from 'geojson';
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, Platform, StyleSheet, View } from 'react-native';
 import type { Hotspot } from '../mock';
+
+const MAP_BORDER_RADIUS = 16;
 
 type Props = { hotspots: Hotspot[] };
 
@@ -37,6 +40,8 @@ function HeatmapInner({ hotspots }: Props) {
   const { coords } = useUserLocation();
   const isFocused = useIsFocused();
   const [lazyReady, setLazyReady] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
 
   // Handlers y efectos
   const onLayout = (e: any) => {
@@ -94,7 +99,9 @@ function HeatmapInner({ hotspots }: Props) {
     let cancelled = false;
     if (isFocused) {
       const timeout = setTimeout(() => {
-        if (!cancelled) {setLazyReady(true);}
+        if (!cancelled) {
+          setLazyReady(true);
+        }
       }, 150);
       return () => {
         cancelled = true;
@@ -104,6 +111,24 @@ function HeatmapInner({ hotspots }: Props) {
       setLazyReady(false);
     }
   }, [isFocused]);
+
+  const shouldMountMap = afterInteractions && lazyReady && dims.w > 0 && dims.h > 0;
+
+  useEffect(() => {
+    if (!shouldMountMap) {
+      setMapLoaded(false);
+      setShowSkeleton(true);
+    }
+  }, [shouldMountMap]);
+
+  useEffect(() => {
+    if (!mapLoaded) {
+      setShowSkeleton(true);
+      return;
+    }
+    const t = setTimeout(() => setShowSkeleton(false), 120);
+    return () => clearTimeout(t);
+  }, [mapLoaded]);
 
   if (Platform.OS === 'web') {
     const dot = isDark ? 'rgba(45, 127, 249, 0.25)' : 'rgba(45, 127, 249, 0.2)';
@@ -123,13 +148,17 @@ function HeatmapInner({ hotspots }: Props) {
 
   return (
     <View style={[styles.map, { backgroundColor: bg }]} onLayout={onLayout}>
-      {afterInteractions && lazyReady && dims.w > 0 && dims.h > 0 && (
+      {showSkeleton && <MapSkeleton isDark={isDark} borderRadius={MAP_BORDER_RADIUS} />}
+      {shouldMountMap && (
         <MapboxGL.MapView
           styleURL={styleURLRef.current}
           style={StyleSheet.absoluteFill}
           compassEnabled={false}
           scaleBarEnabled={false}
-          logoEnabled={false}
+          logoEnabled
+          logoPosition={{ bottom: 12, left: 12 }}
+          onWillStartLoadingMap={() => setMapLoaded(false)}
+          onDidFinishLoadingMap={() => setMapLoaded(true)}
         >
           <MapboxGL.Camera ref={cameraRef} />
           <MapboxGL.ShapeSource id="hotspots-source" shape={geojson}>
@@ -152,11 +181,15 @@ function HeatmapInner({ hotspots }: Props) {
 }
 
 export const HeatmapView = memo(HeatmapInner, (prev, next) => {
-  if (prev.hotspots.length !== next.hotspots.length) {return false;}
+  if (prev.hotspots.length !== next.hotspots.length) {
+    return false;
+  }
   for (let i = 0; i < prev.hotspots.length; i++) {
     const a = prev.hotspots[i];
     const b = next.hotspots[i];
-    if (a.lat !== b.lat || a.lng !== b.lng || a.intensity !== b.intensity) {return false;}
+    if (a.lat !== b.lat || a.lng !== b.lng || a.intensity !== b.intensity) {
+      return false;
+    }
   }
   return true;
 });
@@ -165,7 +198,7 @@ const styles = StyleSheet.create({
   map: {
     width: '100%',
     height: 260,
-    borderRadius: 16,
+    borderRadius: MAP_BORDER_RADIUS,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(127, 179, 255, 0.25)',
